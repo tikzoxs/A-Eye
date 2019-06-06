@@ -338,7 +338,7 @@ Y_train = np.asarray(Y)
 U = np.asarray(np.transpose([[user_no,Gender,age,eye_color]])) #user no, gender, age, eye color
 T = np.asarray(T)
 
-h5_create(filename)
+h5_create(filename) #comment this line if your appending to the same data file by running the code again and again. otherwise it will raise 'file already exist error and you will loose the data'
 h5_append(filename, U, X_train, Y_train, T)
 
 cap.release()
