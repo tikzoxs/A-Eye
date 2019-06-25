@@ -3,15 +3,20 @@ from __future__ import absolute_import, division, print_function
 import tensorflow as tf 
 import numpy as np 
 import h5py
+import generator as gen
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
 FRAMES_TO_DISCARD = 20 #number of frames to desregard from the beginning and the end of the dataset
-RUN_MODE = tf.estimator.ModeKeys.PREDICT
-NO_OF_USERS = 10
+RUN_MODE = tf.estimator.ModeKeys.TRAIN
+NO_OF_USERS_TRAIN = 10
+NO_OF_USERS_EVAL = 3
 NO_OF_TESTS = 10
 TEST_DATA_PATH = "test/"
-TRAIN_DATA_PATH = "train/"
+TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
+LOGGING_ITERATIONS = 50
+MINI_BATCH_SIZE = 128
+NO_OF_STEPS = 20000
 
 #### HYPERPARAMETERS ####
 INPUT_CONCATANATION = 60 #number of Frames considered for a decision
@@ -28,34 +33,38 @@ learning_rate = 0.001
 # st_po = stride of pooling
 #conv1
 n_f_1 = 64
-h_f_1 = 7
-w_f_1 = 7
+h_f_1 = 5
+w_f_1 = 5
+c_f_1 = 60
 st_f_1 = 1
 pd_f_1 = "SAME"
 #conv2
 n_f_2 = 64
-h_f_2 = 7
-w_f_2 = 7
+h_f_2 = 5
+w_f_2 = 5
+c_f_2 = 64
 st_f_2 = 1
 pd_f_2 = "SAME"
 #pool1
 po_1 = 2
-st_po_1 = 1
+st_po_1 = 2
 #conv3
 n_f_3 = 128
-h_f_3 = 5
-w_f_3 = 5
+h_f_3 = 3
+w_f_3 = 3
+c_f_2 = 64
 st_f_3 = 1
 pd_f_3 = "SAME"
 #conv4
 n_f_4 = 128
-h_f_4 = 5
-w_f_4 = 5
+h_f_4 = 3
+w_f_4 = 3
+c_f_2 = 128
 st_f_4 = 1
 pd_f_4 = "SAME"
 #pool2
 po_2 = 2
-st_po_2 = 1
+st_po_2 = 2
 #conv5
 n_f_5 = 256
 h_f_5 = 5
@@ -75,31 +84,33 @@ w_f_7 = 5
 st_f_7 = 1
 pd_f_7 = "SAME"
 #pool3
-po_3 = 2
-st_po_3 = 1
-#conv8
-n_f_8 = 512
-h_f_8 = 3
-w_f_8 = 3
-st_f_8 = 1
-pd_f_8 = "SAME"
-#conv9
-n_f_9 = 512
-h_f_9 = 3
-w_f_9 = 3
-st_f_9 = 1
-pd_f_9 = "SAME"
-#conv10
-n_f_10 = 512
-h_f_10 = 3
-w_f_10 = 3
-st_f_10 = 1
-pd_f_10 = "SAME"
-#pool4
-po_4 = 2
-st_po_4 = 1
+po_h_3 = 3
+po_w_3 = 2
+st_po_h3 = 3
+st_po_w3 = 2
+# #conv8
+# n_f_8 = 512
+# h_f_8 = 3
+# w_f_8 = 3
+# st_f_8 = 1
+# pd_f_8 = "SAME"
+# #conv9
+# n_f_9 = 512
+# h_f_9 = 3
+# w_f_9 = 3
+# st_f_9 = 1
+# pd_f_9 = "SAME"
+# #conv10
+# n_f_10 = 512
+# h_f_10 = 3
+# w_f_10 = 3
+# st_f_10 = 1
+# pd_f_10 = "SAME"
+# #pool4
+# po_4 = 2
+# st_po_4 = 1
 #dense1
-de_1 = 4096
+de_1 = 8192
 dr_1 = 0.4
 #dense2
 de_2 = 1024
@@ -111,51 +122,81 @@ lo_2 = 3
 #logits 3
 lo_3 = 3
 
-def create_input(X, Y, mode = tf.estimator.ModeKeys.PREDICT):
-	n_x = X.shape[0] #no of images
-	h_x = X.shape[1] #height of image
-	w_x = X.shape[2] #width of image
-	n_c = X.shape[3] #number of channels in an image
+def load_file(datapath, mode = tf.estimator.ModeKeys.PREDICT):
+	g = gen.generator(datapath)
+	ds = tf.data.Dataset.from_generator(g, (tf.int8, tf.int8))
+	value = ds.make_one_shot_iterator().get_next()
+	data_sess = tf.Session()
 
-	assert n_x == Y.shape[0], "Data and label size mismatch !!!"
-
-	excess = (n_x - 2 * FRAMES_TO_DISCARD) % INPUT_CONCATANATION
-	inputs = X[FRAMES_TO_DISCARD + excess:-FRAMES_TO_DISCARD,:,:,:].flatten()
-	input_array = np.reshape(inputs,(inputs.shape[0]/INPUT_CONCATANATION, INPUT_CONCATANATION * h_x * w_x * n_c))
-	labels = Y[0:inputs.shape[0]/INPUT_CONCATANATION,:,:]
-
-	if(mode == tf.estimator.ModeKeys.TRAIN):
-		return input_array, labels
-	return input_array
-
-def load_file(datapath):
-	try:
-		with h5py.File(datapath, mode='r') as h5f:
-				X = h5f['X']
-				Y = h5f['Y']
-		return X, Y
-	except:
-		print("No such file")
+	return data_sess, value
 
 def file_handler(folderpath, mode = tf.estimator.ModeKeys.PREDICT):
 	if(RUN_MODE == tf.estimator.ModeKeys.TRAIN):
-		for i in range(1,NO_OF_USERS+1):
-			for j in range(NO_OF_TESTS):
-				datapath = folderpath + str(i) + "_" + str(j) + ".h5"
-				X, Y = load_file(datapath)
-				input_array, labels = create_input(X, Y, mode = tf.estimator.ModeKeys.TRAIN)
-				##run the neural netowrk in train mode
+		print("Trying to load training data file")
+		datapath = folderpath
+		#data_sess, value = load_file(datapath, mode)
+		##run the neural netowrk in train mode
+		run_nn(datapath)
 	else:
-		datapath = folderpath + "test_data.h5"
-		X, Y = load_file(datapath)
-		input_array = create_input(X, Y, mode = tf.estimator.ModeKeys.PREDICT)
-		##run the neural netowrk in test mode
+		print("Trying to load test data file")
+		datapath = folderpath
+		#data_sess, value = load_file(datapath, mode)
+		##run the neural netowrk in train mode
+		run_nn(datapath)
 	return 0
 
-def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
+def Aeye_input_func_gen():
+    shapes = ((300,440,60),(1,3))
+    dataset = tf.data.Dataset.from_generator(generator=gen.generator,
+                                         output_types=(tf.float32, tf.float32),
+                                         output_shapes=shapes)
+    dataset = dataset.batch(128)
+    # dataset = dataset.repeat(20)
+    iterator = dataset.make_one_shot_iterator()
+    features_tensors, labels = iterator.get_next()
+    print(labels.shape)
+    features = {'x': features_tensors}
+    return features, labels
 
-	input_layer = X
+def run_nn(datapath):
+	# Create the Estimator
+	# print("* * * * * trying to run session * * * * *")
+	# try:
+	# 	data = data_sess.run(value)
+	# except tf.errors.OutOfRangeError:
+	# 	print('done.')
+	# print("* * * * * done - run session * * * * *")
+	A_EYE_classifier = tf.estimator.Estimator(
+		model_fn = cnn_model,
+		model_dir = "model_dir/")
 
+	tensors_to_log = {"probabilities": "softmax_tensor"}
+	logging_hook = tf.train.LoggingTensorHook(tensors=tensors_to_log, every_n_iter=LOGGING_ITERATIONS)
+	# print("* * * * * trying normalize and read assign features * * * * *")
+	# feature = tf.image.per_image_standardization(np.reshape(data[0], [-1, 300, 440, 60]))
+	# print("* * * * * feature process done * * * * *")
+	#train the model
+	# train_input_fn = tf.compat.v1.estimator.inputs.numpy_input_fn(
+	# 	x = {"x": feature},
+	# 	y = np.reshape(data[1], [-1, 1, 11]),#batch_size = MINI_BATCH_SIZE,
+	# 	num_epochs = None,
+	# 	shuffle = True)
+	print("* * * * * infut function set up done* * * * *")
+	A_EYE_classifier.train(
+		input_fn = Aeye_input_func_gen,
+		steps = NO_OF_STEPS,
+		hooks = [logging_hook])
+
+	print("* * * * * A_EYE_classifier.train done * * * * *")
+	#Evatuate the model
+	eval_input_fn = Aeye_input_func_gen()
+	eval_results = A_EYE_classifier.evaluate(input_fn=eval_input_fn)
+	print(eval_results)
+
+def cnn_model(features, labels, mode = tf.estimator.ModeKeys.PREDICT):
+	print("* * * * * setting input layer * * * * *")
+	input_layer = features["x"]
+	print("* * * * * setting input layer done* * * * *")
 #Block 1
 	conv1 = tf.layers.conv2d(
 		inputs = input_layer,
@@ -220,40 +261,14 @@ def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
 		activation = tf.nn.relu)
 	pool3 = tf.layers.max_pooling2d(
 		inputs = conv7,
-		pool_size = po_3,
-		strides = st_po_3)
+		pool_size = [po_h_3,po_w_3],
+		strides = [st_po_h3,st_po_w3])
 
-#Block 4
-	conv8 = tf.layers.conv2d(
-		inputs = pool3,
-		filters = n_f_8,
-		kernel_size = [h_f_8, w_f_8],
-		strides = st_f_8,
-		padding = pd_f_8,
-		activation = tf.nn.relu)
-	conv9 = tf.layers.conv2d(
-		inputs = conv8,
-		filters = n_f_9,
-		kernel_size = [h_f_9, w_f_9],
-		strides = st_f_9,
-		padding = pd_f_9,
-		activation = tf.nn.relu)
-	conv10 = tf.layers.conv2d(
-		inputs = conv9,
-		filters = n_f_10,
-		kernel_size = [h_f_10, w_f_10],
-		strides = st_f_10,
-		padding = pd_f_10,
-		activation = tf.nn.relu)
-	pool4 = tf.layers.max_pooling2d(
-		inputs = conv10,
-		pool_size = po_4,
-		strides = st_po_4)
-	flatten_layer = tf.reshape(pool4, [1,-1])
+	flatten_layer = tf.reshape(pool3, [-1,25*55*256])
 
 #Block 5
 	dense1 = tf.layers.dense(
-		inpus = flatten_layer,
+		inputs = flatten_layer,
 		units = de_1,
 		activation = tf.nn.relu)
 	dropout1 = tf.layers.dropout(
@@ -261,7 +276,7 @@ def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
 		rate = dr_1,
 		training = mode == tf.estimator.ModeKeys.TRAIN)
 	dense2 = tf.layers.dense(
-		inpus = dropout1,
+		inputs = dropout1,
 		units = de_2,
 		activation = tf.nn.relu)
 	dropout2 = tf.layers.dropout(
@@ -271,17 +286,17 @@ def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
 
 #Block 6_1
 	logits1 = tf.layers.dense(
-		inpus = dropout2,
+		inputs = dropout2,
 		units = lo_1)
 
 #Block 6_1
 	logits2 = tf.layers.dense(
-		inpus = dropout2,
+		inputs = dropout2,
 		units = lo_2)
 
 #Block 6_1
-	logits2 = tf.layers.dense(
-		inpus = dropout2,
+	logits3 = tf.layers.dense(
+		inputs = dropout2,
 		units = lo_3)
 
 #Predictions in PREDICT mode
@@ -300,14 +315,17 @@ def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
 		}
 
 	if mode == tf.estimator.ModeKeys.PREDICT:
-			return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions1), 
-			tf.estimator.EstimatorSpec(mode = mode, predictions = predictions2), 
-			tf.estimator.EstimatorSpec(mode = mode, predictions = predictions3)
+		return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions1), 
+		tf.estimator.EstimatorSpec(mode = mode, predictions = predictions2), 
+		tf.estimator.EstimatorSpec(mode = mode, predictions = predictions3)
 
 #labels 
-	labels1 = Y[0:5]
-	labels2 = Y[5:8]
-	labels3 = Y[8:11]
+	print(labels.shape)
+	label_split = tf.reshape(labels,[-1,1,3])
+	# print("label split *******************************************************")
+	labels1 = label_split[0,0,0]
+	labels2 = label_split[0,0,1]
+	labels3 = label_split[0,0,2]
 
 #Calculate loss
 	loss1 = tf.losses.sparse_softmax_cross_entropy(labels = labels1, logits = logits1)
@@ -322,8 +340,7 @@ def model(X, Y, mode = mode = tf.estimator.ModeKeys.PREDICT):
 			loss = loss,
 			global_step = tf.train.get_global_step())
 		return tf.estimator.EstimatorSpec(mode = mode, loss = loss, train_op = train_op)
-
-
+   
 #when evaluating 
 	eval_metric_ops = {
 		"accuracy" : tf.metrics.accuracy(
@@ -337,7 +354,12 @@ def main(args):
 	train_data_path = TRAIN_DATA_PATH
 	if(RUN_MODE == tf.estimator.ModeKeys.TRAIN):
 		folderpath = train_data_path
-		file_handler(folderpath, mode = tf.estimator.ModeKeys.TRAIN):
+		file_handler(folderpath, mode = tf.estimator.ModeKeys.TRAIN)
+		print("Train")
 	else:
 		folderpath = test_data_path
-		file_handler(folderpath, mode = tf.estimator.ModeKeys.PREDICT):
+		file_handler(folderpath, mode = tf.estimator.ModeKeys.PREDICT)
+		print("Test")
+
+if __name__ == "__main__":
+  tf.app.run()
