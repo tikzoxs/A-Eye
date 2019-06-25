@@ -37,6 +37,9 @@ tf.app.flags.DEFINE_integer('label_cols', 3,
 TOWER_NAME = 'tower'
 
 #### HYPERPARAMETERS ####
+NO_SCENES = 5
+NO_STRESS = 3
+NO_FOUCS = 3
 INPUT_CONCATANATION = 60 #number of Frames considered for a decision
 SCENE_LOSS_COEFFICIENT = 0.375
 STRESS_LOSS_COEFFICIENT = 0.375
@@ -175,7 +178,7 @@ def max_pool(layer_input, pool_h, pool_w, stride_h, stride_w, padding, name, avg
 		padding = padding,
 		name = name)
 
-def normalize_layer(layer_input, depth_radius = 5, bias = 1.0, alpha = 0.001 / 9.0, beta = 0.75, name = 'norm1'):
+def normalize_layer(layer_input, depth_radius = 5, bias = 1.0, alpha = 0.001 / 9.0, beta = 0.75, name = 'norm'):
 	return tf.nn.lrn(pool1, depth_radius = depth_radius, bias = bias, alpha = alpha / 9.0, beta = beta, name = name)
 
 def flatten_layer(layer_input, layer_name):
@@ -229,14 +232,61 @@ def Aeye_eval_input_func_gen():
     return features, labels
 
 def cnn_model(features):
+	# Block 1
 	conv_l_1 = conv_2d(features, w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
-	conv_l_2 = conv_2d(conv_l_1, w_f_2, h_f_2, c_f_2, n_f_2, st_f_2, pd_f_2, 'conv_l_2', 5e-2, None)
-	pool_l_1 = max_pool(conv_l_2, po_h_1, po_w_1, st_po_h_1, st_po_w_1, pd_po_1, 'pool_l_1')
+	norm_l_1 = normalize_layer(conv_l_1, name = 'norm_l_1')
+	conv_l_2 = conv_2d(norm_l_1, w_f_2, h_f_2, c_f_2, n_f_2, st_f_2, pd_f_2, 'conv_l_2', 5e-2, None)
+	norm_l_2 = normalize_layer(conv_l_2, name = 'norm_l_2')
+	pool_l_1 = max_pool(norm_l_2, po_h_1, po_w_1, st_po_h_1, st_po_w_1, pd_po_1, 'pool_l_1')
+
+	# Block 2
 	conv_l_3 = conv_3d(pool_l_1, w_f_3, h_f_3, c_f_3, n_f_3, st_f_3, pd_f_3, 'conv_l_3', 5e-2, None)
-	conv_l_4 = conv_4d(conv_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
-	conv_l_5 = conv_5d(conv_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
-	pool_l_2 = max_pool(conv_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
+	norm_l_3 = normalize_layer(conv_l_3, name = 'norm_l_3')
+	conv_l_4 = conv_4d(norm_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
+	norm_l_4 = normalize_layer(conv_l_4, name = 'norm_l_4')
+	conv_l_5 = conv_5d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
+	norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
+	pool_l_2 = max_pool(norm_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
+
+	# Block 3
 	conv_l_6 = conv_6d(pool_l_1, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)
-	conv_l_7 = conv_7d(conv_l_3, w_f_7, h_f_7, c_f_7, n_f_7, st_f_7, pd_f_7, 'conv_l_7', 5e-2, None)
-	conv_l_8 = conv_8d(conv_l_4, w_f_8, h_f_8, c_f_8, n_f_8, st_f_8, pd_f_8, 'conv_l_8', 5e-2, None)
-	pool_l_3 = max_pool(conv_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
+	norm_l_6 = normalize_layer(conv_l_6, name = 'norm_l_6')
+	conv_l_7 = conv_7d(norm_l_3, w_f_7, h_f_7, c_f_7, n_f_7, st_f_7, pd_f_7, 'conv_l_7', 5e-2, None)
+	norm_l_7 = normalize_layer(conv_l_7, name = 'norm_l_7')
+	conv_l_8 = conv_8d(norm_l_4, w_f_8, h_f_8, c_f_8, n_f_8, st_f_8, pd_f_8, 'conv_l_8', 5e-2, None)
+	norm_l_8 = normalize_layer(conv_l_8, name = 'norm_l_8')
+	pool_l_3 = max_pool(norm_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
+
+	# Block 4
+	flatten, flatten_length = flatten_layer(pool_l_3, 'flatten')
+	dense_l_1 = dense_layer(flatten, flatten_length, de_1, 'dense_l_1')
+	dense_l_2 = dense_layer(dense_l_1, de_1, de_2, 'dense_l_2')
+
+	# Block 5
+	sparse_softmax_scene = dense_layer(
+		dense_l_2,
+		de_2, NO_SCENES,
+		'sparse_softmax_scene',
+		is_output_layer = True,
+		stddev = 1/de_2,
+		wieght_decay_parameter = None,
+		initializer_parameter = 0.0)
+	sparse_softmax_scene = dense_layer(
+		dense_l_2,
+		de_2, NO_STRESS,
+		'sparse_softmax_scene',
+		is_output_layer = True,
+		stddev = 1/de_2,
+		wieght_decay_parameter = None,
+		initializer_parameter = 0.0)
+	sparse_softmax_scene = dense_layer(
+		dense_l_2,
+		de_2, NO_FOUCS,
+		'sparse_softmax_scene',
+		is_output_layer = True,
+		stddev = 1/de_2,
+		wieght_decay_parameter = None,
+		initializer_parameter = 0.0)
+
+def loss(logits, scene_label, stress_label, focus_label):
+	
