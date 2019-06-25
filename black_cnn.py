@@ -1,6 +1,10 @@
 import numpy as np 
 import tensorflow as tf 
 import generator as geny
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+import re
 
 #uncomment for GPU 
 #tf.test.gpu_device_name()
@@ -30,13 +34,17 @@ tf.app.flags.DEFINE_integer('label_rows', 1,
 tf.app.flags.DEFINE_integer('label_cols', 3,
                             """dimension 2 of a single label array.""")
 
+TOWER_NAME = 'tower'
 
 #### HYPERPARAMETERS ####
 INPUT_CONCATANATION = 60 #number of Frames considered for a decision
-object_loss_coefficient = 0.375
-stress_loss_coefficient = 0.375
-focus_loss_coefficient = 1 - object_loss_coefficient - stress_loss_coefficient
-learning_rate = 0.001
+SCENE_LOSS_COEFFICIENT = 0.375
+STRESS_LOSS_COEFFICIENT = 0.375
+FOCUS_LOSS_COEFFICIENT = 1 - SCENE_LOSS_COEFFICIENT - STRESS_LOSS_COEFFICIENT
+MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
+NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
+LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
+INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 ###############################
 ## n_f = number of filters ####
 ## h_f = height of filter #####
@@ -137,7 +145,7 @@ def _create_cpu_variable(name, shape, initializer):
     	var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
   	return var
 
-def variable_with_weight_decay_option(name, shpae, stddev, wieght_decay_parameter):
+def _variable_with_weight_decay_option(name, shpae, stddev, wieght_decay_parameter):
 	dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
 	var = _create_cpu_variable(name, shape, tf.truncated_normal_initializer(stddev = stddev, dtype = dtype))
 	if wieght_decay_parameter is not None:
@@ -145,9 +153,9 @@ def variable_with_weight_decay_option(name, shpae, stddev, wieght_decay_paramete
 		tf.add_to_collection('losses', weight_decay)
 	return var
 
-def conv_2d(layer_input, width, height, channels, filters, strides, padding, stddev):
+def conv_2d(layer_input, width, height, channels, filters, strides, padding, layer_name, stddev, wieght_decay_parameter):
 	with tf.variable_scope(layer_name) as scope:
-		kernel = variable_with_weight_decay_option(
+		kernel = _variable_with_weight_decay_option(
 			'weights',
 			shape = [width, height, channels, filters],
 			stddev = stddev,
@@ -156,6 +164,8 @@ def conv_2d(layer_input, width, height, channels, filters, strides, padding, std
 		biases = _create_cpu_variable('biases', [filters], tf.constant_initializer(0.0))
 		biases_added = tf.nn.bias_add(conv_out, biases)
 		layer_out = tf.nn.relu(biases_added, name = scope.name)
+		_activation_summary(layer_out)
+	return layer_out
 
 def max_pool(layer_input, pool_h, pool_w, stride_h, stride_w, padding, name, avg_batches = 1, avg_channels = 1, strie_of_batch = 1, stride_of_channels = 1):
 	return tf.nn.max_pool(
@@ -165,8 +175,34 @@ def max_pool(layer_input, pool_h, pool_w, stride_h, stride_w, padding, name, avg
 		padding = padding,
 		name = name)
 
-def normalize_layer(layer_input, depth_radius = 5, bias=1.0, alpha=0.001 / 9.0, beta=0.75,name='norm1'):
+def normalize_layer(layer_input, depth_radius = 5, bias = 1.0, alpha = 0.001 / 9.0, beta = 0.75, name = 'norm1'):
 	return tf.nn.lrn(pool1, depth_radius = depth_radius, bias = bias, alpha = alpha / 9.0, beta = beta, name = name)
+
+def flatten_layer(layer_input, layer_name):
+	with tf.variable_scope(layer_name) as scope:
+		flatten = tf.keras.Flatten()(layer_input)
+		length = flatten.get_shape()[1].value
+	return flatten, length
+
+def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, is_output_layer = False, stddev = 0.04, wieght_decay_parameter = 0.004, initializer_parameter = 0.1):
+	with tf.variable_scope(layer_name) as scope:
+		this_layer = _variable_with_weight_decay_option(
+			'weights',
+			shape = [length_prev_layer, length_this_layer],
+			stddev =stddev,
+			wieght_decay_parameter = wieght_decay_parameter)
+		biases = _create_cpu_variable(
+			'biases',
+			[length_this_layer],
+			tf.constant_initializer(initializer_parameter))
+		dense_mul = tf.add(tf.matmul(layer_input, this_layer), biases)
+		if(is_output_layer):
+			dense_out = tf.nn.relu(dense_mul, name = scope.name)
+			_activation_summary(dense_out)
+	if(is_output_layer):
+		return dense_mul
+	else:
+		return dense_out
 
 def Aeye_train_input_func_gen():
     shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
@@ -191,3 +227,16 @@ def Aeye_eval_input_func_gen():
     print(labels.shape)
     features = {'x': features_tensors}
     return features, labels
+
+def cnn_model(features):
+	conv_l_1 = conv_2d(features, w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
+	conv_l_2 = conv_2d(conv_l_1, w_f_2, h_f_2, c_f_2, n_f_2, st_f_2, pd_f_2, 'conv_l_2', 5e-2, None)
+	pool_l_1 = max_pool(conv_l_2, po_h_1, po_w_1, st_po_h_1, st_po_w_1, pd_po_1, 'pool_l_1')
+	conv_l_3 = conv_3d(pool_l_1, w_f_3, h_f_3, c_f_3, n_f_3, st_f_3, pd_f_3, 'conv_l_3', 5e-2, None)
+	conv_l_4 = conv_4d(conv_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
+	conv_l_5 = conv_5d(conv_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
+	pool_l_2 = max_pool(conv_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
+	conv_l_6 = conv_6d(pool_l_1, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)
+	conv_l_7 = conv_7d(conv_l_3, w_f_7, h_f_7, c_f_7, n_f_7, st_f_7, pd_f_7, 'conv_l_7', 5e-2, None)
+	conv_l_8 = conv_8d(conv_l_4, w_f_8, h_f_8, c_f_8, n_f_8, st_f_8, pd_f_8, 'conv_l_8', 5e-2, None)
+	pool_l_3 = max_pool(conv_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
