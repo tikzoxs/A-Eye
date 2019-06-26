@@ -48,6 +48,7 @@ MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
 NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 2 ** 12
 ###############################
 ## n_f = number of filters ####
 ## h_f = height of filter #####
@@ -72,8 +73,11 @@ c_f_2 = 64
 st_f_2 = 1
 pd_f_2 = "SAME"
 #pool1
-po_1 = 2
-st_po_1 = 2
+po_h_1 = 3
+po_w_1 = 3
+st_po_h_1 = 2
+st_po_w_1 = 2
+pd_po_1 = 'SAME'
 #conv3
 n_f_3 = 128
 h_f_3 = 3
@@ -89,8 +93,11 @@ c_f_2 = 128
 st_f_4 = 1
 pd_f_4 = "SAME"
 #pool2
-po_2 = 2
-st_po_2 = 2
+po_h_2 = 3
+po_w_2 = 3
+st_po_h_2 = 2
+st_po_w_2 = 2
+pd_po_2 = 'SAME'
 #conv5
 n_f_5 = 256
 h_f_5 = 5
@@ -111,9 +118,10 @@ st_f_7 = 1
 pd_f_7 = "SAME"
 #pool3
 po_h_3 = 3
-po_w_3 = 2
-st_po_h3 = 3
-st_po_w3 = 2
+po_w_3 = 3
+st_po_h_3 = 2
+st_po_w_3 = 2
+pd_po_3 = 'SAME'
 #dense1
 de_1 = 8192
 dr_1 = 0.4
@@ -263,30 +271,74 @@ def cnn_model(features):
 	dense_l_2 = dense_layer(dense_l_1, de_1, de_2, 'dense_l_2')
 
 	# Block 5
+	dense_scene = dense_layer(dense_l_2, de_2, de_scene, 'dense_scene')
+	dense_stress = dense_layer(dense_l_2, de_2, de_stress, 'dense_stress')
+	dense_focus = dense_layer(dense_l_2, de_2, de_focus, 'dense_focus')
+
+	# Block 5
 	sparse_softmax_scene = dense_layer(
-		dense_l_2,
-		de_2, NO_SCENES,
+		dense_scene,
+		scene, NO_SCENES,
 		'sparse_softmax_scene',
 		is_output_layer = True,
-		stddev = 1/de_2,
+		stddev = 1/de_scene,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
 	sparse_softmax_scene = dense_layer(
-		dense_l_2,
-		de_2, NO_STRESS,
+		dense_stress,
+		de_stress, NO_STRESS,
 		'sparse_softmax_scene',
 		is_output_layer = True,
-		stddev = 1/de_2,
+		stddev = 1/de_stress,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
 	sparse_softmax_scene = dense_layer(
-		dense_l_2,
-		de_2, NO_FOUCS,
+		dense_focus,
+		de_focus, NO_FOUCS,
 		'sparse_softmax_scene',
 		is_output_layer = True,
-		stddev = 1/de_2,
+		stddev = 1/de_focus,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
 
-def loss(logits, scene_label, stress_label, focus_label):
-	
+def loss(scene_logits, stress_logits, focus_logits, scene_label, stress_label, focus_label):
+	scene_labels = tf.cast(scene_label, tf.int64)
+	stress_labels = tf.cast(stress_label, tf.int64)
+	focus_labels = tf.cast(focus_label, tf.int64)
+
+	scene_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+		labels = scene_labels,
+		logits = scene_logits,
+		name = 'scene_cross_entropy_per_example')
+	scene_cross_entropy_mean = tf.reduce_mean(scene_cross_entropy, name = 'scene_cross_entropy')
+
+	stress_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+		labels = stress_labels,
+		logits = stress_logits,
+		name = 'stress_cross_entropy_per_example')
+	stress_cross_entropy_mean = tf.reduce_mean(stress_cross_entropy, name = 'stress_cross_entropy')
+
+	focus_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+		labels = focus_labels,
+		logits = focus_logits,
+		name = 'focus_cross_entropy_per_example')
+	focus_cross_entropy_mean = tf.reduce_mean(focus_cross_entropy, name = 'focus_cross_entropy')
+
+	final_loss =  tf.add_n(
+		[SCENE_LOSS_COEFFICIENT * scene_cross_entropy_mean,
+		STRESS_LOSS_COEFFICIENT * tress_cross_entropy_mean,
+		FOCUS_LOSS_COEFFICIENT * focus_cross_entropy_mean]) 
+	tf.add_to_collection('losses', final_loss)
+	return tf.add_n(tf.get_collection('losses'), name='total_loss')
+
+def _add_loss_summaries(total_loss):
+	loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
+	losses = tf.get_collection('losses')
+	loss_averages_op = loss_averages.apply(losses + [total_loss])
+	for l in losses + [total_loss]:
+		tf.summary.scalar(l.op.name + ' (raw)', l)
+		tf.summary.scalar(l.op.name, loss_averages.average(l))
+	return loss_averages_op
+
+def train(total_loss, global_step):
+	num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
