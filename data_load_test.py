@@ -7,7 +7,7 @@ import generator as gen
 
 datapath = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
 g = gen.generator(datapath)
-ds = tf.data.Dataset.from_generator(g, (tf.int8, tf.int8))
+ds = tf.data.Dataset.from_generator(g, (tf.int8, tf.int8, tf.int8, tf.int8))
 
 value = ds.make_one_shot_iterator().get_next()
 
@@ -17,7 +17,7 @@ sess = tf.Session()
 while True:
     try:
         data = sess.run(value)
-        print(data[1].shape)
+        print(data[0].shape, data[1], data[2], data[3])
     except tf.errors.OutOfRangeError:
         print('done.')
         break

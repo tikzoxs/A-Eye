@@ -48,7 +48,7 @@ MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
 NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 2 ** 12
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 2 ** 10
 ###############################
 ## n_f = number of filters ####
 ## h_f = height of filter #####
@@ -208,6 +208,8 @@ def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, i
 			tf.constant_initializer(initializer_parameter))
 		dense_mul = tf.add(tf.matmul(layer_input, this_layer), biases)
 		if(is_output_layer):
+			_activation_summary(dense_mul)
+		else:
 			dense_out = tf.nn.relu(dense_mul, name = scope.name)
 			_activation_summary(dense_out)
 	if(is_output_layer):
@@ -222,10 +224,10 @@ def Aeye_train_input_func_gen():
                                          output_shapes=shapes)
     dataset = dataset.batch(128)
     iterator = dataset.make_one_shot_iterator()
-    features_tensors, labels = iterator.get_next()
-    print(labels.shape)
-    features = {'x': features_tensors}
-    return features, labels
+    features_tensors, label1, label2, label3 = iterator.get_next()
+    images = tf.image.per_image_standardization(features_tensors)
+    features = {'x': images}
+    return features, label1, label2, label3
 
 def Aeye_eval_input_func_gen():
     shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
@@ -234,12 +236,12 @@ def Aeye_eval_input_func_gen():
                                          output_shapes=shapes)
     dataset = dataset.batch(128)
     iterator = dataset.make_one_shot_iterator()
-    features_tensors, labels = iterator.get_next()
-    print(labels.shape)
-    features = {'x': features_tensors}
-    return features, labels
+    features_tensors, label1, label2, label3 = iterator.get_next()
+    images = tf.image.per_image_standardization(features_tensors)
+    features = {'x': images}
+    return features, label1, label2, label3
 
-def cnn_model(features):
+def inference(features):
 	# Block 1
 	conv_l_1 = conv_2d(features, w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
 	norm_l_1 = normalize_layer(conv_l_1, name = 'norm_l_1')
@@ -284,7 +286,7 @@ def cnn_model(features):
 		stddev = 1/de_scene,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
-	sparse_softmax_scene = dense_layer(
+	sparse_softmax_stress = dense_layer(
 		dense_stress,
 		de_stress, NO_STRESS,
 		'sparse_softmax_scene',
@@ -292,7 +294,7 @@ def cnn_model(features):
 		stddev = 1/de_stress,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
-	sparse_softmax_scene = dense_layer(
+	sparse_softmax_focus = dense_layer(
 		dense_focus,
 		de_focus, NO_FOUCS,
 		'sparse_softmax_scene',
@@ -300,6 +302,8 @@ def cnn_model(features):
 		stddev = 1/de_focus,
 		wieght_decay_parameter = None,
 		initializer_parameter = 0.0)
+
+	return sparse_softmax_scene, sparse_softmax_focus, sparse_softmax_stress
 
 def loss(scene_logits, stress_logits, focus_logits, scene_label, stress_label, focus_label):
 	scene_labels = tf.cast(scene_label, tf.int64)
