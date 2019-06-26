@@ -32,10 +32,10 @@ def train_Aeye():
 
 		loss = black_cnn.loss(logits_scene, logits_stress, scene_label, stress_label, focus_label)
 
-		train_op = train(loss, global_step)
+		train_op = black_cnn.train(loss, global_step)
 
 		class _LoggerHook(tf.train.SessionRunHook):
-	      """Logs loss and runtime."""
+			"""Logs loss and runtime."""
 
 			def begin(self):
 				self._step = -1
@@ -69,9 +69,9 @@ def train_Aeye():
 
 def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):
-		tf.gfile.DeleteRecurively(FLAGS.train_dir)
+		tf.gfile.DeleteRecursively(FLAGS.train_dir)
 	tf.gfile.MakeDirs(FLAGS.train_dir)
-	train()
+	train_Aeye()
 
 if __name__ == '__main__':
 	tf.app.run()

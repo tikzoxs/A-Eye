@@ -1,10 +1,10 @@
-import numpy as np 
-import tensorflow as tf 
-import generator as geny
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import re
+import numpy as np 
+import tensorflow as tf 
+import generator as geny
 
 #uncomment for GPU 
 #tf.test.gpu_device_name()
@@ -136,25 +136,25 @@ lo_2 = 3
 lo_3 = 3
 
 def _activation_summary(x):
-  """Helper to create summaries for activations.
-  Creates a summary that provides a histogram of activations.
-  Creates a summary that measures the sparsity of activations.
-  Args:
-    x: Tensor
-  Returns:
-    nothing
-  """
-  # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
-  # session. This helps the clarity of presentation on tensorboard.
-  tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
-  tf.summary.histogram(tensor_name + '/activations', x)
-  tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
+	"""Helper to create summaries for activations.
+	Creates a summary that provides a histogram of activations.
+	Creates a summary that measures the sparsity of activations.
+	Args:
+	x: Tensor
+	Returns:
+	nothing
+	"""
+	# Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
+	# session. This helps the clarity of presentation on tensorboard.
+	tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
+	tf.summary.histogram(tensor_name + '/activations', x)
+	tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
 
 def _create_cpu_variable(name, shape, initializer):
 	with tf.device('/cpu:0'):
-    	dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
-    	var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
-  	return var
+		dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
+		var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
+	return var
 
 def _variable_with_weight_decay_option(name, shpae, stddev, wieght_decay_parameter):
 	dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
@@ -218,28 +218,28 @@ def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, i
 		return dense_out
 
 def Aeye_train_input_func_gen():
-    shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
-    dataset = tf.data.Dataset.from_generator(generator=gen.generator,
-                                         output_types=(tf.float32, tf.float32),
-                                         output_shapes=shapes)
-    dataset = dataset.batch(128)
-    iterator = dataset.make_one_shot_iterator()
-    features_tensors, label1, label2, label3 = iterator.get_next()
-    images = tf.image.per_image_standardization(features_tensors)
-    features = {'x': images}
-    return features, label1, label2, label3
+	shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
+	dataset = tf.data.Dataset.from_generator(generator=gen.generator,
+	                                     output_types=(tf.float32, tf.float32),
+	                                     output_shapes=shapes)
+	dataset = dataset.batch(128)
+	iterator = dataset.make_one_shot_iterator()
+	features_tensors, label1, label2, label3 = iterator.get_next()
+	images = tf.image.per_image_standardization(features_tensors)
+	features = {'x': images}
+	return features, label1, label2, label3
 
 def Aeye_eval_input_func_gen():
-    shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
-    dataset = tf.data.Dataset.from_generator(generator=gen.generator,
-                                         output_types=(tf.float32, tf.float32),
-                                         output_shapes=shapes)
-    dataset = dataset.batch(128)
-    iterator = dataset.make_one_shot_iterator()
-    features_tensors, label1, label2, label3 = iterator.get_next()
-    images = tf.image.per_image_standardization(features_tensors)
-    features = {'x': images}
-    return features, label1, label2, label3
+	shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
+	dataset = tf.data.Dataset.from_generator(generator=gen.generator,
+	                                     output_types=(tf.float32, tf.float32),
+	                                     output_shapes=shapes)
+	dataset = dataset.batch(128)
+	iterator = dataset.make_one_shot_iterator()
+	features_tensors, label1, label2, label3 = iterator.get_next()
+	images = tf.image.per_image_standardization(features_tensors)
+	features = {'x': images}
+	return features, label1, label2, label3
 
 def inference(features):
 	# Block 1
