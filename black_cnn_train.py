@@ -25,7 +25,7 @@ def train_Aeye():
 	with tf.Graph().as_default():
 		gloabl_step = tf.train.get_or_create_global_step()
 
-		with tf.device('/cpu"0'):
+		with tf.device('/cpu:0'):
 			features, scene_label, stress_label, focus_label = black_cnn.Aeye_train_input_func_gen()
 
 		logits_scene, logits_stress, logits_focus = black_cnn.inference(features)

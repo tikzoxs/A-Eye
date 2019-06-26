@@ -21,7 +21,7 @@ tf.app.flags.DEFINE_integer('logging_iterations', 50,
                             """Number of iterations to wait till logging.""")
 tf.app.flags.DEFINE_integer('no_epochs', 2000,
                             """Number of epochs to train over datset.""")
-tf.app.flags.DEFINE_boolean('use_fp16', True,
+tf.app.flags.DEFINE_boolean('use_fp16', False,
                             """Train the model using fp16.""")
 tf.app.flags.DEFINE_integer('image_width', 440,
                             """image width.""")
@@ -63,14 +63,14 @@ n_f_1 = 64
 h_f_1 = 5
 w_f_1 = 5
 c_f_1 = 60
-st_f_1 = 1
+st_f_1 = [1,1,1,1]
 pd_f_1 = "SAME"
 #conv2
 n_f_2 = 64
 h_f_2 = 5
 w_f_2 = 5
 c_f_2 = 64
-st_f_2 = 1
+st_f_2 = [1,1,1,1]
 pd_f_2 = "SAME"
 #pool1
 po_h_1 = 3
@@ -82,15 +82,15 @@ pd_po_1 = 'SAME'
 n_f_3 = 128
 h_f_3 = 3
 w_f_3 = 3
-c_f_2 = 64
-st_f_3 = 1
+c_f_3 = 64
+st_f_3 = [1,1,1,1]
 pd_f_3 = "SAME"
 #conv4
 n_f_4 = 128
 h_f_4 = 3
 w_f_4 = 3
-c_f_2 = 128
-st_f_4 = 1
+c_f_4 = 128
+st_f_4 = [1,1,1,1]
 pd_f_4 = "SAME"
 #pool2
 po_h_2 = 3
@@ -100,22 +100,32 @@ st_po_w_2 = 2
 pd_po_2 = 'SAME'
 #conv5
 n_f_5 = 256
-h_f_5 = 5
-w_f_5 = 5
-st_f_5 = 1
+h_f_5 = 3
+w_f_5 = 3
+c_f_5 = 128
+st_f_5 = [1,1,1,1]
 pd_f_5 = "SAME"
 #conv6
 n_f_6 = 256
-h_f_6 = 5
-w_f_6 = 5
-st_f_6 = 1
+h_f_6 = 3
+w_f_6 = 3
+c_f_6 = 256
+st_f_6 = [1,1,1,1]
 pd_f_6 = "SAME"
 #conv7
 n_f_7 = 256
-h_f_7 = 5
-w_f_7 = 5
-st_f_7 = 1
+h_f_7 = 3
+w_f_7 = 3
+c_f_7 = 256
+st_f_7 = [1,1,1,1]
 pd_f_7 = "SAME"
+#conv8
+n_f_8 = 256
+h_f_8 = 3
+w_f_8 = 3
+c_f_8 = 256
+st_f_8 = [1,1,1,1]
+pd_f_8 = "SAME"
 #pool3
 po_h_3 = 3
 po_w_3 = 3
@@ -156,7 +166,7 @@ def _create_cpu_variable(name, shape, initializer):
 		var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
 	return var
 
-def _variable_with_weight_decay_option(name, shpae, stddev, wieght_decay_parameter):
+def _variable_with_weight_decay_option(name, shape, stddev, wieght_decay_parameter):
 	dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
 	var = _create_cpu_variable(name, shape, tf.truncated_normal_initializer(stddev = stddev, dtype = dtype))
 	if wieght_decay_parameter is not None:
@@ -187,11 +197,11 @@ def max_pool(layer_input, pool_h, pool_w, stride_h, stride_w, padding, name, avg
 		name = name)
 
 def normalize_layer(layer_input, depth_radius = 5, bias = 1.0, alpha = 0.001 / 9.0, beta = 0.75, name = 'norm'):
-	return tf.nn.lrn(pool1, depth_radius = depth_radius, bias = bias, alpha = alpha / 9.0, beta = beta, name = name)
+	return tf.nn.lrn(layer_input, depth_radius = depth_radius, bias = bias, alpha = alpha / 9.0, beta = beta, name = name)
 
 def flatten_layer(layer_input, layer_name):
 	with tf.variable_scope(layer_name) as scope:
-		flatten = tf.keras.Flatten()(layer_input)
+		flatten = tf.keras.layers.Flatten()(layer_input)
 		length = flatten.get_shape()[1].value
 	return flatten, length
 
@@ -218,52 +228,52 @@ def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, i
 		return dense_out
 
 def Aeye_train_input_func_gen():
-	shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
-	dataset = tf.data.Dataset.from_generator(generator=gen.generator,
-	                                     output_types=(tf.float32, tf.float32),
-	                                     output_shapes=shapes)
-	dataset = dataset.batch(128)
+	# shapes = ((FLAGS.image_height, FLAGS.image_width, FLAGS.image_channels),(FLAGS.label_rows, FLAGS.label_cols))
+	dataset = tf.data.Dataset.from_generator(generator=geny.generator,
+	                                     output_types=(tf.int8, tf.int8, tf.int8, tf.int8))
+	dataset = dataset.batch(FLAGS.batch_size)
 	iterator = dataset.make_one_shot_iterator()
-	features_tensors, label1, label2, label3 = iterator.get_next()
+	[features_tensors, label1, label2, label3] = iterator.get_next()
+	features_tensors = tf.cast(features_tensors, tf.float32)
 	images = tf.image.per_image_standardization(features_tensors)
 	features = {'x': images}
 	return features, label1, label2, label3
 
 def Aeye_eval_input_func_gen():
-	shapes = ((image_height, image_width, image_channels),(label_rows, label_cols))
-	dataset = tf.data.Dataset.from_generator(generator=gen.generator,
-	                                     output_types=(tf.float32, tf.float32),
-	                                     output_shapes=shapes)
-	dataset = dataset.batch(128)
+	# shapes = ((FLAGS.image_height, FLAGS.image_width, FLAGS.image_channels),(FLAGS.label_rows, FLAGS.label_cols))
+	dataset = tf.data.Dataset.from_generator(generator=geny.generator,
+	                                     output_types=(tf.int8, tf.int8, tf.int8, tf.int8))
+	dataset = dataset.batch(FLAGS.batch_size)
 	iterator = dataset.make_one_shot_iterator()
-	features_tensors, label1, label2, label3 = iterator.get_next()
+	[features_tensors, label1, label2, label3] = iterator.get_next()
+	features_tensors = tf.cast(features_tensors, tf.float32)
 	images = tf.image.per_image_standardization(features_tensors)
 	features = {'x': images}
 	return features, label1, label2, label3
 
 def inference(features):
 	# Block 1
-	conv_l_1 = conv_2d(features, w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
+	conv_l_1 = conv_2d(features["x"], w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
 	norm_l_1 = normalize_layer(conv_l_1, name = 'norm_l_1')
 	conv_l_2 = conv_2d(norm_l_1, w_f_2, h_f_2, c_f_2, n_f_2, st_f_2, pd_f_2, 'conv_l_2', 5e-2, None)
 	norm_l_2 = normalize_layer(conv_l_2, name = 'norm_l_2')
 	pool_l_1 = max_pool(norm_l_2, po_h_1, po_w_1, st_po_h_1, st_po_w_1, pd_po_1, 'pool_l_1')
 
 	# Block 2
-	conv_l_3 = conv_3d(pool_l_1, w_f_3, h_f_3, c_f_3, n_f_3, st_f_3, pd_f_3, 'conv_l_3', 5e-2, None)
+	conv_l_3 = conv_2d(pool_l_1, w_f_3, h_f_3, c_f_3, n_f_3, st_f_3, pd_f_3, 'conv_l_3', 5e-2, None)
 	norm_l_3 = normalize_layer(conv_l_3, name = 'norm_l_3')
-	conv_l_4 = conv_4d(norm_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
+	conv_l_4 = conv_2d(norm_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
 	norm_l_4 = normalize_layer(conv_l_4, name = 'norm_l_4')
-	conv_l_5 = conv_5d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
+	conv_l_5 = conv_2d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
 	norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
 	pool_l_2 = max_pool(norm_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
 
 	# Block 3
-	conv_l_6 = conv_6d(pool_l_1, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)
+	conv_l_6 = conv_2d(pool_l_2, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)
 	norm_l_6 = normalize_layer(conv_l_6, name = 'norm_l_6')
-	conv_l_7 = conv_7d(norm_l_3, w_f_7, h_f_7, c_f_7, n_f_7, st_f_7, pd_f_7, 'conv_l_7', 5e-2, None)
+	conv_l_7 = conv_2d(norm_l_6, w_f_7, h_f_7, c_f_7, n_f_7, st_f_7, pd_f_7, 'conv_l_7', 5e-2, None)
 	norm_l_7 = normalize_layer(conv_l_7, name = 'norm_l_7')
-	conv_l_8 = conv_8d(norm_l_4, w_f_8, h_f_8, c_f_8, n_f_8, st_f_8, pd_f_8, 'conv_l_8', 5e-2, None)
+	conv_l_8 = conv_2d(norm_l_7, w_f_8, h_f_8, c_f_8, n_f_8, st_f_8, pd_f_8, 'conv_l_8', 5e-2, None)
 	norm_l_8 = normalize_layer(conv_l_8, name = 'norm_l_8')
 	pool_l_3 = max_pool(norm_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
 
