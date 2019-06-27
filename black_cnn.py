@@ -15,7 +15,7 @@ TEST_DATA_PATH = "test/"
 TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
 
 #### BASIC PARAMETERS ####
-tf.app.flags.DEFINE_integer('batch_size', 128,
+tf.app.flags.DEFINE_integer('batch_size', 32,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('logging_iterations', 50,
                             """Number of iterations to wait till logging.""")
@@ -138,6 +138,10 @@ dr_1 = 0.4
 #dense2
 de_2 = 1024
 dr_2 = 0.4
+#softmax
+de_scene = 5
+de_stress = 3
+de_focus = 3
 #logits 1
 lo_1 = 5
 #logits 2
@@ -188,7 +192,7 @@ def conv_2d(layer_input, width, height, channels, filters, strides, padding, lay
 			stddev = stddev,
 			wieght_decay_parameter = wieght_decay_parameter)
 		conv_out = tf.nn.conv2d(layer_input, kernel, strides, padding)
-		biases = _create_cpu_variable('biases', [filters], tf.constant_initializer(0.0))
+		biases = _create_cpu_variable('biases', [filters], tf.constant_initializer(0.1))
 		biases_added = tf.nn.bias_add(conv_out, biases)
 		layer_out = tf.nn.relu(biases_added, name = scope.name)
 		_activation_summary(layer_out)
@@ -209,18 +213,19 @@ def flatten_layer_followed_by_dense(layer_input, length_this_layer, layer_name, 
 	with tf.variable_scope(layer_name) as scope:
 		flatten = tf.keras.layers.Flatten()(layer_input)
 		length_prev_layer = flatten.get_shape()[1].value
+		length_prev_layer = 132000 #change this to the fucking correct value
 		print("*/*/*/*/*/*/*/*/*/*/*/*//*/*/*/*")
 		print([length_prev_layer, length_this_layer])
 		this_layer = _variable_with_weight_decay_option(
 			'weights',
-			shape = tf.convert_to_tensor([length_prev_layer, length_this_layer]),
+			shape = [length_prev_layer, length_this_layer],
 			stddev =stddev,
 			wieght_decay_parameter = wieght_decay_parameter)
 		biases = _create_cpu_variable(
 			'biases',
 			[length_this_layer],
 			tf.constant_initializer(initializer_parameter))
-		dense_mul = tf.add(tf.matmul(layer_input, this_layer), biases)
+		dense_mul = tf.add(tf.matmul(flatten, this_layer), biases)
 		dense_out = tf.nn.relu(dense_mul, name = scope.name)
 		_activation_summary(dense_out)
 	return dense_out
@@ -299,6 +304,7 @@ def inference(features):
 
 	# Block 4
 	print("**************************Before Dense 1****************************************")
+	print(pool_l_3.shape)
 	dense_l_1 = flatten_layer_followed_by_dense(pool_l_3, de_1, 'dense_l_1')
 	print("**************************Before Dense 2****************************************")
 	dense_l_2 = dense_layer(dense_l_1, de_1, de_2, 'dense_l_2')
@@ -312,7 +318,8 @@ def inference(features):
 	# Block 5
 	sparse_softmax_scene = dense_layer(
 		dense_scene,
-		scene, NO_SCENES,
+		de_scene,
+		NO_SCENES,
 		'sparse_softmax_scene',
 		is_output_layer = True,
 		stddev = 1/de_scene,
@@ -320,8 +327,9 @@ def inference(features):
 		initializer_parameter = 0.0)
 	sparse_softmax_stress = dense_layer(
 		dense_stress,
-		de_stress, NO_STRESS,
-		'sparse_softmax_scene',
+		de_stress,
+		NO_STRESS,
+		'sparse_softmax_stress',
 		is_output_layer = True,
 		stddev = 1/de_stress,
 		wieght_decay_parameter = None,
@@ -329,7 +337,7 @@ def inference(features):
 	sparse_softmax_focus = dense_layer(
 		dense_focus,
 		de_focus, NO_FOUCS,
-		'sparse_softmax_scene',
+		'sparse_softmax_focus',
 		is_output_layer = True,
 		stddev = 1/de_focus,
 		wieght_decay_parameter = None,
@@ -362,7 +370,7 @@ def loss(scene_logits, stress_logits, focus_logits, scene_label, stress_label, f
 
 	final_loss =  tf.add_n(
 		[SCENE_LOSS_COEFFICIENT * scene_cross_entropy_mean,
-		STRESS_LOSS_COEFFICIENT * tress_cross_entropy_mean,
+		STRESS_LOSS_COEFFICIENT * stress_cross_entropy_mean,
 		FOCUS_LOSS_COEFFICIENT * focus_cross_entropy_mean]) 
 	tf.add_to_collection('losses', final_loss)
 	return tf.add_n(tf.get_collection('losses'), name='total_loss')
