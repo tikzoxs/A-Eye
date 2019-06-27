@@ -163,12 +163,18 @@ def _activation_summary(x):
 def _create_cpu_variable(name, shape, initializer):
 	with tf.device('/cpu:0'):
 		dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
-		var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
+		if initializer is not None and not callable(initializer):
+			var = tf.get_variable(name, initializer=initializer, dtype=dtype)
+		else:
+			var = tf.get_variable(name, shape = shape, initializer=initializer, dtype=dtype)
 	return var
 
 def _variable_with_weight_decay_option(name, shape, stddev, wieght_decay_parameter):
 	dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
-	var = _create_cpu_variable(name, shape, tf.truncated_normal_initializer(stddev = stddev, dtype = dtype))
+	truncated_normal = tf.truncated_normal_initializer()#(stddev = stddev)
+	print("******************************************************************")
+	print(shape)
+	var = _create_cpu_variable(name, shape, truncated_normal(shape, dtype = dtype))
 	if wieght_decay_parameter is not None:
 		weight_decay = tf.multiply(tf.nn.l2_loss(var), wieght_decay_parameter, name = 'weight_loss')
 		tf.add_to_collection('losses', weight_decay)
@@ -199,11 +205,25 @@ def max_pool(layer_input, pool_h, pool_w, stride_h, stride_w, padding, name, avg
 def normalize_layer(layer_input, depth_radius = 5, bias = 1.0, alpha = 0.001 / 9.0, beta = 0.75, name = 'norm'):
 	return tf.nn.lrn(layer_input, depth_radius = depth_radius, bias = bias, alpha = alpha / 9.0, beta = beta, name = name)
 
-def flatten_layer(layer_input, layer_name):
+def flatten_layer_followed_by_dense(layer_input, length_this_layer, layer_name, stddev = 0.04, wieght_decay_parameter = 0.004, initializer_parameter = 0.1):
 	with tf.variable_scope(layer_name) as scope:
 		flatten = tf.keras.layers.Flatten()(layer_input)
-		length = flatten.get_shape()[1].value
-	return flatten, length
+		length_prev_layer = flatten.get_shape()[1].value
+		print("*/*/*/*/*/*/*/*/*/*/*/*//*/*/*/*")
+		print([length_prev_layer, length_this_layer])
+		this_layer = _variable_with_weight_decay_option(
+			'weights',
+			shape = tf.convert_to_tensor([length_prev_layer, length_this_layer]),
+			stddev =stddev,
+			wieght_decay_parameter = wieght_decay_parameter)
+		biases = _create_cpu_variable(
+			'biases',
+			[length_this_layer],
+			tf.constant_initializer(initializer_parameter))
+		dense_mul = tf.add(tf.matmul(layer_input, this_layer), biases)
+		dense_out = tf.nn.relu(dense_mul, name = scope.name)
+		_activation_summary(dense_out)
+	return dense_out
 
 def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, is_output_layer = False, stddev = 0.04, wieght_decay_parameter = 0.004, initializer_parameter = 0.1):
 	with tf.variable_scope(layer_name) as scope:
@@ -278,11 +298,13 @@ def inference(features):
 	pool_l_3 = max_pool(norm_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
 
 	# Block 4
-	flatten, flatten_length = flatten_layer(pool_l_3, 'flatten')
-	dense_l_1 = dense_layer(flatten, flatten_length, de_1, 'dense_l_1')
+	print("**************************Before Dense 1****************************************")
+	dense_l_1 = flatten_layer_followed_by_dense(pool_l_3, de_1, 'dense_l_1')
+	print("**************************Before Dense 2****************************************")
 	dense_l_2 = dense_layer(dense_l_1, de_1, de_2, 'dense_l_2')
 
 	# Block 5
+	print("**************************Before Softmax****************************************")
 	dense_scene = dense_layer(dense_l_2, de_2, de_scene, 'dense_scene')
 	dense_stress = dense_layer(dense_l_2, de_2, de_stress, 'dense_stress')
 	dense_focus = dense_layer(dense_l_2, de_2, de_focus, 'dense_focus')
