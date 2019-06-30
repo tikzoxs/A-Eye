@@ -49,7 +49,6 @@ NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 2 ** 10
-FLATTEN_LAYER_LENGTH = 108800
 ###############################
 ## n_f = number of filters ####
 ## h_f = height of filter #####
@@ -134,10 +133,10 @@ st_po_h_3 = 3
 st_po_w_3 = 3
 pd_po_3 = 'SAME'
 #dense1
-de_1 = 1024
+de_1 = 2048
 dr_1 = 0.4
 #dense2
-de_2 = 512
+de_2 = 1024
 dr_2 = 0.4
 #softmax
 de_scene = 5
@@ -214,22 +213,7 @@ def flatten_layer_followed_by_dense(layer_input, length_this_layer, layer_name, 
 	with tf.variable_scope(layer_name) as scope:
 		flatten = tf.keras.layers.Flatten()(layer_input)
 		length_prev_layer = flatten.get_shape()[1].value
-		length_prev_layer = FLATTEN_LAYER_LENGTH #change this to the fucking correct value
-		print("*/*/*/*/*/*/*/*/*/*/*/*//*/*/*/*")
-		print([length_prev_layer, length_this_layer])
-		this_layer = _variable_with_weight_decay_option(
-			'weights',
-			shape = [length_prev_layer, length_this_layer],
-			stddev =stddev,
-			wieght_decay_parameter = wieght_decay_parameter)
-		biases = _create_cpu_variable(
-			'biases',
-			[length_this_layer],
-			tf.constant_initializer(initializer_parameter))
-		dense_mul = tf.add(tf.matmul(flatten, this_layer), biases)
-		dense_out = tf.nn.relu(dense_mul, name = scope.name)
-		_activation_summary(dense_out)
-	return dense_out
+	return length_prev_layer
 
 def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, is_output_layer = False, stddev = 0.04, wieght_decay_parameter = 0.004, initializer_parameter = 0.1):
 	with tf.variable_scope(layer_name) as scope:
@@ -252,30 +236,6 @@ def dense_layer(layer_input, length_prev_layer, length_this_layer, layer_name, i
 		return dense_mul
 	else:
 		return dense_out
-
-def Aeye_train_input_func_gen():
-	# shapes = ((FLAGS.image_height, FLAGS.image_width, FLAGS.image_channels),(FLAGS.label_rows, FLAGS.label_cols))
-	dataset = tf.data.Dataset.from_generator(generator=geny.generator(TRAIN_DATA_PATH),
-	                                     output_types=(tf.int8, tf.int8, tf.int8, tf.int8))
-	dataset = dataset.batch(FLAGS.batch_size)
-	iterator = dataset.make_one_shot_iterator()
-	[features_tensors, label1, label2, label3] = iterator.get_next()
-	features_tensors = tf.cast(features_tensors, tf.float32)
-	images = tf.image.per_image_standardization(features_tensors)
-	features = {'x': images}
-	return features, label1, label2, label3
-
-def Aeye_eval_input_func_gen():
-	# shapes = ((FLAGS.image_height, FLAGS.image_width, FLAGS.image_channels),(FLAGS.label_rows, FLAGS.label_cols))
-	dataset = tf.data.Dataset.from_generator(generator=geny.generator,
-	                                     output_types=(tf.int8, tf.int8, tf.int8, tf.int8))
-	dataset = dataset.batch(FLAGS.batch_size)
-	iterator = dataset.make_one_shot_iterator()
-	[features_tensors, label1, label2, label3] = iterator.get_next()
-	features_tensors = tf.cast(features_tensors, tf.float32)
-	images = tf.image.per_image_standardization(features_tensors)
-	features = {'x': images}
-	return features, label1, label2, label3
 
 def inference(features):
 	# Block 1
@@ -303,119 +263,13 @@ def inference(features):
 	norm_l_8 = normalize_layer(conv_l_8, name = 'norm_l_8')
 	pool_l_3 = max_pool(norm_l_8, po_h_3, po_w_3, st_po_h_3, st_po_w_3, pd_po_3, 'pool_l_2')
 
+	dlength = flatten_layer_followed_by_dense(pool_l_3, de_1, 'dense_l_1')
 	# Block 4
-	print("**************************Before Dense 1****************************************")
-	print(pool_l_3.shape)
-	dense_l_1 = flatten_layer_followed_by_dense(pool_l_3, de_1, 'dense_l_1')
-	print("**************************Before Dense 2****************************************")
-	dense_l_2 = dense_layer(dense_l_1, de_1, de_2, 'dense_l_2')
 
-	# Block 5
-	print("**************************Before Softmax****************************************")
-	dense_scene = dense_layer(dense_l_2, de_2, de_scene, 'dense_scene')
-	dense_stress = dense_layer(dense_l_2, de_2, de_stress, 'dense_stress')
-	dense_focus = dense_layer(dense_l_2, de_2, de_focus, 'dense_focus')
+	print(dlength)
 
-	# Block 5
-	sparse_softmax_scene = dense_layer(
-		dense_scene,
-		de_scene,
-		NO_SCENES,
-		'sparse_softmax_scene',
-		is_output_layer = True,
-		stddev = 1/de_scene,
-		wieght_decay_parameter = None,
-		initializer_parameter = 0.0)
-	sparse_softmax_stress = dense_layer(
-		dense_stress,
-		de_stress,
-		NO_STRESS,
-		'sparse_softmax_stress',
-		is_output_layer = True,
-		stddev = 1/de_stress,
-		wieght_decay_parameter = None,
-		initializer_parameter = 0.0)
-	sparse_softmax_focus = dense_layer(
-		dense_focus,
-		de_focus, NO_FOUCS,
-		'sparse_softmax_focus',
-		is_output_layer = True,
-		stddev = 1/de_focus,
-		wieght_decay_parameter = None,
-		initializer_parameter = 0.0)
 
-	return sparse_softmax_scene, sparse_softmax_focus, sparse_softmax_stress
-
-def loss(scene_logits, stress_logits, focus_logits, scene_label, stress_label, focus_label):
-	scene_labels = tf.cast(scene_label, tf.int64)
-	stress_labels = tf.cast(stress_label, tf.int64)
-	focus_labels = tf.cast(focus_label, tf.int64)
-
-	scene_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-		labels = scene_labels,
-		logits = scene_logits,
-		name = 'scene_cross_entropy_per_example')
-	scene_cross_entropy_mean = tf.reduce_mean(scene_cross_entropy, name = 'scene_cross_entropy')
-
-	stress_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-		labels = stress_labels,
-		logits = stress_logits,
-		name = 'stress_cross_entropy_per_example')
-	stress_cross_entropy_mean = tf.reduce_mean(stress_cross_entropy, name = 'stress_cross_entropy')
-
-	focus_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-		labels = focus_labels,
-		logits = focus_logits,
-		name = 'focus_cross_entropy_per_example')
-	focus_cross_entropy_mean = tf.reduce_mean(focus_cross_entropy, name = 'focus_cross_entropy')
-
-	final_loss =  tf.add_n(
-		[SCENE_LOSS_COEFFICIENT * scene_cross_entropy_mean,
-		STRESS_LOSS_COEFFICIENT * stress_cross_entropy_mean,
-		FOCUS_LOSS_COEFFICIENT * focus_cross_entropy_mean]) 
-	tf.add_to_collection('losses', final_loss)
-	return tf.add_n(tf.get_collection('losses'), name='total_loss')
-
-def _add_loss_summaries(total_loss):
-	loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
-	losses = tf.get_collection('losses')
-	loss_averages_op = loss_averages.apply(losses + [total_loss])
-	for l in losses + [total_loss]:
-		tf.summary.scalar(l.op.name + ' (raw)', l)
-		tf.summary.scalar(l.op.name, loss_averages.average(l))
-	return loss_averages_op
-
-def train(total_loss, global_step):
-	num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
-	decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
-
-	lr =tf.train.exponential_decay(
-		INITIAL_LEARNING_RATE,
-		global_step,
-		decay_steps,
-		LEARNING_RATE_DECAY_FACTOR,
-		staircase = True)
-	tf.summary.scalar('learning_rate', lr)
-
-	loss_averages_op = _add_loss_summaries(total_loss)
-
-	with tf.control_dependencies([loss_averages_op]):
-		optimizer = tf.train.AdamOptimizer(learning_rate = lr)
-		gradients = optimizer.compute_gradients(total_loss)
-
-	apply_gradient_op = optimizer.apply_gradients(gradients, global_step = global_step)
-
-	for var in tf.trainable_variables():
-		tf.summary.histogram(var.op.name, var)
-
-	for grad, var in gradients:
-		if grad is not None:
-			tf.summary.histogram(var.op.name + '/gradients', grad)
-
-	variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
-	with tf.control_dependencies([apply_gradient_op]):
-		variables_averages_op = variable_averages.apply(tf.trainable_variables())
-
-	return variables_averages_op
-
+test_array = tf.cast(np.random.randn(1,300,440,60),tf.float32)
+features = {"x": test_array}
+inference(features)
 

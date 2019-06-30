@@ -34,6 +34,20 @@ def train_Aeye():
 
 		train_op = black_cnn.train(loss, global_step)
 
+		total_parameters = 0
+		for variable in tf.trainable_variables():
+		# shape is an array of tf.Dimension
+			shape = variable.get_shape()
+			print(shape)
+			print(len(shape))
+			variable_parameters = 1
+			for dim in shape:
+				print(dim)
+				variable_parameters *= dim.value
+			print(variable_parameters)
+			total_parameters += variable_parameters
+		print("Total  trainable parameters : " + str(total_parameters / 1000000) + " Million")
+
 		class _LoggerHook(tf.train.SessionRunHook):
 			"""Logs loss and runtime."""
 
