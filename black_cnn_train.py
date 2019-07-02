@@ -14,7 +14,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('train_dir', '/tmp/Aeye_train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-tf.app.flags.DEFINE_integer('max_steps', 1600,
+tf.app.flags.DEFINE_integer('max_steps', 100000,
                             """Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -80,6 +80,8 @@ def train_Aeye():
 			config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement)) as mon_sess:
 			while not mon_sess.should_stop():
 				mon_sess.run(train_op)
+			save_path = saver.save(mon_sess, "/tmp/model.ckpt")
+			print("Model saved in path: %s" % save_path)
 
 def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):
