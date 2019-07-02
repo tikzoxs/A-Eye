@@ -4,7 +4,7 @@ import numpy as np
 
 class generator:
 	def __init__(self, file):
-		self.file = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
+		self.file = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
 
 	def __call__(self):
 		with h5py.File(self.file, 'r') as h5f:

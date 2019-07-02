@@ -8,6 +8,7 @@ import time
 import tensorflow as tf
 
 import black_cnn as black_cnn
+import black_cnn_eval as black_cnn_eval
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -83,11 +84,14 @@ def train_Aeye():
 			save_path = saver.save(mon_sess, "/tmp/model.ckpt")
 			print("Model saved in path: %s" % save_path)
 
+
+
 def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):
 		tf.gfile.DeleteRecursively(FLAGS.train_dir)
 	tf.gfile.MakeDirs(FLAGS.train_dir)
 	train_Aeye()
+	black_cnn_eval.eval_func()
 
 if __name__ == '__main__':
 	tf.app.run()

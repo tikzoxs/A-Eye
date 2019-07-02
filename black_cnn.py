@@ -12,7 +12,7 @@ FLAGS = tf.app.flags.FLAGS
 
 RUN_MODE = tf.estimator.ModeKeys.TRAIN
 TEST_DATA_PATH = "test/"
-TRAIN_DATA_PATH = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
+TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
 
 #### BASIC PARAMETERS ####
 tf.app.flags.DEFINE_integer('batch_size', 64,
@@ -65,7 +65,7 @@ d_f_1 = 15
 h_f_1 = 5
 w_f_1 = 5
 c_f_1 = 60
-st_f_1 = [1,1,1,1,1]
+st_f_1 = [1,1,1,1]
 pd_f_1 = "SAME"
 #conv2
 n_f_2 = 64
@@ -282,7 +282,7 @@ def Aeye_train_input_func_gen():
 
 def Aeye_eval_input_func_gen():
 	# shapes = ((FLAGS.image_height, FLAGS.image_width, FLAGS.image_channels),(FLAGS.label_rows, FLAGS.label_cols))
-	dataset = tf.data.Dataset.from_generator(generator=geny.generator,
+	dataset = tf.data.Dataset.from_generator(generator=geny.generator(TRAIN_DATA_PATH),
 	                                     output_types=(tf.int8, tf.int8, tf.int8, tf.int8))
 	dataset = dataset.batch(FLAGS.batch_size)
 	iterator = dataset.make_one_shot_iterator()
