@@ -12,14 +12,14 @@ FLAGS = tf.app.flags.FLAGS
 
 RUN_MODE = tf.estimator.ModeKeys.TRAIN
 TEST_DATA_PATH = "test/"
-TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
+TRAIN_DATA_PATH = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
 
 #### BASIC PARAMETERS ####
-tf.app.flags.DEFINE_integer('batch_size', 1,
+tf.app.flags.DEFINE_integer('batch_size', 64,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('logging_iterations', 50,
                             """Number of iterations to wait till logging.""")
-tf.app.flags.DEFINE_integer('no_epochs', 2000,
+tf.app.flags.DEFINE_integer('no_epochs', 100,
                             """Number of epochs to train over datset.""")
 tf.app.flags.DEFINE_boolean('use_fp16', False,
                             """Train the model using fp16.""")
@@ -49,7 +49,7 @@ NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 2 ** 10
-FLATTEN_LAYER_LENGTH = 108800
+FLATTEN_LAYER_LENGTH = 6144
 ###############################
 ## n_f = number of filters ####
 ## h_f = height of filter #####
@@ -60,17 +60,18 @@ FLATTEN_LAYER_LENGTH = 108800
 ## st_po = stride of pooling ##
 ###############################
 #conv1
-n_f_1 = 64
+n_f_1 = 32
+d_f_1 = 15
 h_f_1 = 5
 w_f_1 = 5
 c_f_1 = 60
-st_f_1 = [1,1,1,1]
+st_f_1 = [1,1,1,1,1]
 pd_f_1 = "SAME"
 #conv2
 n_f_2 = 64
 h_f_2 = 5
 w_f_2 = 5
-c_f_2 = 64
+c_f_2 = 32
 st_f_2 = [1,1,1,1]
 pd_f_2 = "SAME"
 #pool1
@@ -100,32 +101,32 @@ st_po_h_2 = 3
 st_po_w_2 = 3
 pd_po_2 = 'SAME'
 #conv5
-n_f_5 = 256
-h_f_5 = 3
-w_f_5 = 3
-c_f_5 = 128
-st_f_5 = [1,1,1,1]
-pd_f_5 = "SAME"
+# n_f_5 = 256
+# h_f_5 = 3
+# w_f_5 = 3
+# c_f_5 = 128
+# st_f_5 = [1,1,1,1]
+# pd_f_5 = "SAME"
 #conv6
 n_f_6 = 256
 h_f_6 = 3
 w_f_6 = 3
-c_f_6 = 256
-st_f_6 = [1,1,1,1]
+c_f_6 = 128
+st_f_6 = [1,2,2,1]
 pd_f_6 = "SAME"
 #conv7
 n_f_7 = 256
 h_f_7 = 3
 w_f_7 = 3
 c_f_7 = 256
-st_f_7 = [1,1,1,1]
+st_f_7 = [1,2,2,1]
 pd_f_7 = "SAME"
 #conv8
-n_f_8 = 256
+n_f_8 = 512
 h_f_8 = 3
 w_f_8 = 3
 c_f_8 = 256
-st_f_8 = [1,1,1,1]
+st_f_8 = [1,2,2,1]
 pd_f_8 = "SAME"
 #pool3
 po_h_3 = 3
@@ -193,6 +194,20 @@ def conv_2d(layer_input, width, height, channels, filters, strides, padding, lay
 			stddev = stddev,
 			wieght_decay_parameter = wieght_decay_parameter)
 		conv_out = tf.nn.conv2d(layer_input, kernel, strides, padding)
+		biases = _create_cpu_variable('biases', [filters], tf.constant_initializer(0.1))
+		biases_added = tf.nn.bias_add(conv_out, biases)
+		layer_out = tf.nn.relu(biases_added, name = scope.name)
+		_activation_summary(layer_out)
+	return layer_out
+
+def conv_3d(layer_input, depth, width, height, channels, filters, strides, padding, layer_name, stddev, wieght_decay_parameter):
+	with tf.variable_scope(layer_name) as scope:
+		kernel = _variable_with_weight_decay_option(
+			'weights',
+			shape = [depth, width, height, channels, filters],
+			stddev = stddev,
+			wieght_decay_parameter = wieght_decay_parameter)
+		conv_out = tf.nn.conv3d(layer_input, kernel, strides, padding)
 		biases = _create_cpu_variable('biases', [filters], tf.constant_initializer(0.1))
 		biases_added = tf.nn.bias_add(conv_out, biases)
 		layer_out = tf.nn.relu(biases_added, name = scope.name)
@@ -279,6 +294,7 @@ def Aeye_eval_input_func_gen():
 
 def inference(features):
 	# Block 1
+	# conv_l_1 = conv_3d(features["x"], d_f_1, w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
 	conv_l_1 = conv_2d(features["x"], w_f_1, h_f_1, c_f_1, n_f_1, st_f_1, pd_f_1, 'conv_l_1', 5e-2, None)
 	norm_l_1 = normalize_layer(conv_l_1, name = 'norm_l_1')
 	conv_l_2 = conv_2d(norm_l_1, w_f_2, h_f_2, c_f_2, n_f_2, st_f_2, pd_f_2, 'conv_l_2', 5e-2, None)
@@ -290,9 +306,9 @@ def inference(features):
 	norm_l_3 = normalize_layer(conv_l_3, name = 'norm_l_3')
 	conv_l_4 = conv_2d(norm_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
 	norm_l_4 = normalize_layer(conv_l_4, name = 'norm_l_4')
-	conv_l_5 = conv_2d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
-	norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
-	pool_l_2 = max_pool(norm_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
+	# conv_l_5 = conv_2d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
+	# norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
+	pool_l_2 = max_pool(norm_l_4, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
 
 	# Block 3
 	conv_l_6 = conv_2d(pool_l_2, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)

@@ -80,6 +80,8 @@ def train_Aeye():
 			config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement)) as mon_sess:
 			while not mon_sess.should_stop():
 				mon_sess.run(train_op)
+			save_path = saver.save(mon_sess, "/tmp/model.ckpt")
+			print("Model saved in path: %s" % save_path)
 
 def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):

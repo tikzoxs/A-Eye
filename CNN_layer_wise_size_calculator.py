@@ -5,6 +5,10 @@ import re
 import numpy as np 
 import tensorflow as tf 
 import generator as geny
+import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 #uncomment for GPU 
 #tf.test.gpu_device_name()
@@ -12,14 +16,14 @@ FLAGS = tf.app.flags.FLAGS
 
 RUN_MODE = tf.estimator.ModeKeys.TRAIN
 TEST_DATA_PATH = "test/"
-TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
+TRAIN_DATA_PATH = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
 
 #### BASIC PARAMETERS ####
-tf.app.flags.DEFINE_integer('batch_size', 1,
+tf.app.flags.DEFINE_integer('batch_size', 4,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('logging_iterations', 50,
                             """Number of iterations to wait till logging.""")
-tf.app.flags.DEFINE_integer('no_epochs', 2000,
+tf.app.flags.DEFINE_integer('no_epochs', 100,
                             """Number of epochs to train over datset.""")
 tf.app.flags.DEFINE_boolean('use_fp16', False,
                             """Train the model using fp16.""")
@@ -99,32 +103,32 @@ st_po_h_2 = 3
 st_po_w_2 = 3
 pd_po_2 = 'SAME'
 #conv5
-n_f_5 = 256
-h_f_5 = 3
-w_f_5 = 3
-c_f_5 = 128
-st_f_5 = [1,1,1,1]
-pd_f_5 = "SAME"
+# n_f_5 = 256
+# h_f_5 = 3
+# w_f_5 = 3
+# c_f_5 = 128
+# st_f_5 = [1,1,1,1]
+# pd_f_5 = "SAME"
 #conv6
 n_f_6 = 256
 h_f_6 = 3
 w_f_6 = 3
-c_f_6 = 256
-st_f_6 = [1,1,1,1]
+c_f_6 = 128
+st_f_6 = [1,2,2,1]
 pd_f_6 = "SAME"
 #conv7
-n_f_7 = 256
+n_f_7 = 512
 h_f_7 = 3
 w_f_7 = 3
 c_f_7 = 256
-st_f_7 = [1,1,1,1]
+st_f_7 = [1,2,2,1]
 pd_f_7 = "SAME"
 #conv8
-n_f_8 = 256
+n_f_8 = 512
 h_f_8 = 3
 w_f_8 = 3
 c_f_8 = 256
-st_f_8 = [1,1,1,1]
+st_f_8 = [1,2,2,1]
 pd_f_8 = "SAME"
 #pool3
 po_h_3 = 3
@@ -250,9 +254,9 @@ def inference(features):
 	norm_l_3 = normalize_layer(conv_l_3, name = 'norm_l_3')
 	conv_l_4 = conv_2d(norm_l_3, w_f_4, h_f_4, c_f_4, n_f_4, st_f_4, pd_f_4, 'conv_l_4', 5e-2, None)
 	norm_l_4 = normalize_layer(conv_l_4, name = 'norm_l_4')
-	conv_l_5 = conv_2d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
-	norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
-	pool_l_2 = max_pool(norm_l_5, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
+	# conv_l_5 = conv_2d(norm_l_4, w_f_5, h_f_5, c_f_5, n_f_5, st_f_5, pd_f_5, 'conv_l_5', 5e-2, None)
+	# norm_l_5 = normalize_layer(conv_l_5, name = 'norm_l_5')
+	pool_l_2 = max_pool(norm_l_4, po_h_2, po_w_2, st_po_h_2, st_po_w_2, pd_po_2, 'pool_l_2')
 
 	# Block 3
 	conv_l_6 = conv_2d(pool_l_2, w_f_6, h_f_6, c_f_6, n_f_6, st_f_6, pd_f_6, 'conv_l_6', 5e-2, None)
