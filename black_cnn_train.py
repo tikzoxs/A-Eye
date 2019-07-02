@@ -90,8 +90,9 @@ def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):
 		tf.gfile.DeleteRecursively(FLAGS.train_dir)
 	tf.gfile.MakeDirs(FLAGS.train_dir)
+	black_cnn_eval.eval_func()
 	train_Aeye()
 	black_cnn_eval.eval_func()
 
-if __name__ == '__main__':
-	tf.app.run()
+# if __name__ == '__main__':
+# 	tf.app.run()
