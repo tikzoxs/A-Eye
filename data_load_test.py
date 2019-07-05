@@ -5,7 +5,7 @@ import numpy as np
 import h5py
 import generator as gen
 
-datapath = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
+datapath = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
 g = gen.generator(datapath)
 ds = tf.data.Dataset.from_generator(g, (tf.int8, tf.int8, tf.int8, tf.int8))
 

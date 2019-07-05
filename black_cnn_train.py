@@ -10,17 +10,21 @@ import tensorflow as tf
 import black_cnn as black_cnn
 import black_cnn_eval as black_cnn_eval
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('train_dir', '/tmp/Aeye_train',
+tf.app.flags.DEFINE_string('train_dir', '/home/tkal976/Desktop/git/A-Eye/tmp/train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 100000,
                             """Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
-tf.app.flags.DEFINE_integer('log_frequency', 10,
+tf.app.flags.DEFINE_integer('log_frequency', 8,
                             """How often to log results to the console.""")
+tf.app.flags.DEFINE_integer('ckpt_frequency', 8,
+                            """How often to save checkpoints.""")
 
 def train_Aeye():
 	with tf.Graph().as_default():
@@ -78,11 +82,12 @@ def train_Aeye():
 		with tf.train.MonitoredTrainingSession(
 			checkpoint_dir=FLAGS.train_dir,
 			hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),tf.train.NanTensorHook(loss),_LoggerHook()],
-			config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement)) as mon_sess:
+			config=tf.ConfigProto(log_device_placement=FLAGS.log_device_placement),
+			save_checkpoint_steps=FLAGS.ckpt_frequency) as mon_sess:
 			while not mon_sess.should_stop():
 				mon_sess.run(train_op)
-			save_path = saver.save(mon_sess, "/tmp/model.ckpt")
-			print("Model saved in path: %s" % save_path)
+			# save_path = saver.save(mon_sess, "/home/tkal976/Desktop/git/A-Eye/tmp/train/model.ckpt")
+			# print("Model saved in path: %s" % save_path)
 
 
 
@@ -90,9 +95,8 @@ def main(argv = None):
 	if tf.gfile.Exists(FLAGS.train_dir):
 		tf.gfile.DeleteRecursively(FLAGS.train_dir)
 	tf.gfile.MakeDirs(FLAGS.train_dir)
-	black_cnn_eval.eval_func()
 	train_Aeye()
 	black_cnn_eval.eval_func()
 
-# if __name__ == '__main__':
-# 	tf.app.run()
+if __name__ == '__main__':
+	tf.app.run()
