@@ -251,7 +251,7 @@ def h5_append(datapath, U, X, Y, T):
 			print(tdset.shape)
 
 
-user_no = 14
+user_no = 140
 Gender = 1
 # Male = 1
 # Female = 2
@@ -261,7 +261,7 @@ eye_color = 1
 # Black	= 2
 # Blue = 3
 # blue-ish green = 4
-
+ztharhaerh
 cap = cv2.VideoCapture(1)
 
 count1 = 0
@@ -273,18 +273,18 @@ crop_y2 = crop_y1 + 440
 while(True):
 	count1 = count1 + 1    
 	# Capture frame-by-frame
-	ret, frame = cap.read()
-	frame  = frame[crop_x1:crop_x2, crop_y1:crop_y2]
+	ret, frame1 = cap.read()
+	frame  = frame1[crop_x1:crop_x2, crop_y1:crop_y2]
 
 	# Our operations on the frame come here
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
 	frame_name = str(user_no) + '_' + str(count1) + '.jpg'
 	if(count1 %100 == 0):
-		cv2.imwrite(frame_name, frame)
+		cv2.imwrite(frame_name, frame1)
 
 	# Display the resulting frame
-	cv2.imshow('frame',frame)
+	cv2.imshow('frame',frame1)
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 	    break
 

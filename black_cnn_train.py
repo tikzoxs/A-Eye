@@ -14,7 +14,7 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('train_dir', '/home/tkal976/Desktop/git/A-Eye/tmp/train',
+tf.app.flags.DEFINE_string('train_dir', '/home/tkal976/Desktop/Black/Codes/git/A-Eye/tmp/',
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 100000,
@@ -92,10 +92,10 @@ def train_Aeye():
 
 
 def main(argv = None):
-	if tf.gfile.Exists(FLAGS.train_dir):
-		tf.gfile.DeleteRecursively(FLAGS.train_dir)
-	tf.gfile.MakeDirs(FLAGS.train_dir)
-	train_Aeye()
+	# if tf.gfile.Exists(FLAGS.train_dir):
+	# 	tf.gfile.DeleteRecursively(FLAGS.train_dir)
+	# tf.gfile.MakeDirs(FLAGS.train_dir)
+	# train_Aeye()
 	black_cnn_eval.eval_func()
 
 if __name__ == '__main__':

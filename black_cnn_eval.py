@@ -14,11 +14,11 @@ import black_cnn as black_cnn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '/home/tkal976/Desktop/git/A-Eye/tmp/eval',
+tf.app.flags.DEFINE_string('eval_dir', '/home/tkal976/Desktop/Black/Codes/git/A-Eye/tmp/eval',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/home/tkal976/Desktop/git/A-Eye/tmp/final_model',
+tf.app.flags.DEFINE_string('checkpoint_dir', '/home/tkal976/Desktop/Black/Codes/git/A-Eye/tmp/train',
                            """Directory where to read model checkpoints.""")
 tf.app.flags.DEFINE_integer('eval_interval_secs', 5,
                             """How often to run the eval.""")
@@ -100,8 +100,8 @@ def evaluate():
     focus_vector = tf.one_hot(tf.cast(focus_label, tf.int32), 3)
 
     # Calculate predictions.
-    top_k_op_scene = tf.nn.in_top_k(logits_scene, tf.cast(scene_label, tf.int32), 1)
-    # top_k_op_stress = tf.nn.in_top_k(logits_stress, tf.cast(stress_label, tf.int32), 1)
+    # top_k_op_scene = tf.nn.in_top_k(logits_scene, tf.cast(scene_label, tf.int32), 1)
+    top_k_op_stress = tf.nn.in_top_k(logits_stress, tf.cast(stress_label, tf.int32), 1)
     # top_k_op_focus = tf.nn.in_top_k(logits_focus, tf.cast(focus_label, tf.int32), 1)
     # top_k_op = tf.concat([top_k_op_scene, top_k_op_stress, top_k_op_focus], 0)
 
@@ -117,7 +117,7 @@ def evaluate():
     summary_writer = tf.summary.FileWriter(FLAGS.eval_dir, g)
 
     while True:
-      eval_once(saver, summary_writer, top_k_op_scene, summary_op)
+      eval_once(saver, summary_writer, top_k_op_stress, summary_op)
       if FLAGS.run_once:
         break
       time.sleep(FLAGS.eval_interval_secs)

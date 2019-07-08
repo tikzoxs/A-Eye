@@ -12,10 +12,10 @@ FLAGS = tf.app.flags.FLAGS
 
 RUN_MODE = tf.estimator.ModeKeys.TRAIN
 TEST_DATA_PATH = "test/"
-TRAIN_DATA_PATH = "/home/tkal976/Desktop/grey/Aeye_grey.h5"
+TRAIN_DATA_PATH = "/media/tkal976/Transcend/Tharindu/grey/Aeye_grey.h5"
 
 #### BASIC PARAMETERS ####
-tf.app.flags.DEFINE_integer('batch_size', 64,
+tf.app.flags.DEFINE_integer('batch_size', 4,
                             """Number of images to process in a batch.""")
 tf.app.flags.DEFINE_integer('logging_iterations', 8,
                             """Number of iterations to wait till logging.""")
