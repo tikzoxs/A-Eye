@@ -142,20 +142,21 @@ def calibrate(camera, cap):
 
 def setup_camera(camera, cap):
 	calibrate(camera, cap)
+	print("attempted Sharpness = " + str(blur_thresh))
 
 
-camera = 1
-cap = cv2.VideoCapture(camera)
-setup_camera(camera, cap)
+# camera = 1
+# cap = cv2.VideoCapture(camera)
+# setup_camera(camera, cap)
 
-print("attempted Sharpness = " + str(blur_thresh))
-while(True):
-	ret, frame = cap.read()
-	cv2.imshow('frame_cropped',frame)
-	if cv2.waitKey(1) & 0xFF == ord('q'):
-	    break
-cap.release()
-cv2.destroyAllWindows()
+
+# while(True):
+# 	ret, frame = cap.read()
+# 	cv2.imshow('frame_cropped',frame)
+# 	if cv2.waitKey(1) & 0xFF == ord('q'):
+# 	    break
+# cap.release()
+# cv2.destroyAllWindows()
 
 
 

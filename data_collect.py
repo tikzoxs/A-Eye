@@ -1,4 +1,4 @@
-# X contains images of size (480, 640, 3)
+   # X contains images of size (300, 440, 3)
 # Y contains vecors of size (11,1) : [screen, books, person close, person + environment, other, relaxed, medium stress, stressed, one point focus, multi point focus, no focus]
 
 #!home/tkal976/.virtualenvs/cv/bin/python
@@ -8,6 +8,18 @@ import numpy as np
 from matplotlib import pyplot as plt
 import time
 import h5py
+import eye_focus as eye_focus
+import detect_iris as detect_iris
+
+IMAGE_WIDTH = 440
+IMAGE_HEIGHT = 300
+CAMERA_NO = 0
+
+#user information
+user_no = 100
+Gender = 1 # Male = 1 | Female = 2
+age = 30
+eye_color = 1 # Brown = 1 | Black	= 2 | Blue = 3 | Blue-ish green = 4
 
 def stroop(X,Y,T):
 	i = 0
@@ -49,7 +61,7 @@ def mines(X,Y,T):
 			break
 		T.append(1)
 		X.append(frame)
-		Y.append(np.transpose([1,0,0,0,0,0,0,1,0,1,0]))
+		Y.append(np.transpose([1,0,0,0,0,0,1,0,0,1,0])) #####this is the correct label
 		print(i)
 	print("Finished")
 
@@ -71,7 +83,7 @@ def tcounting(X,Y,T):
 			break
 		T.append(2)
 		X.append(frame)
-		Y.append(np.transpose([1,0,0,0,0,0,0,1,1,0,0]))
+		Y.append(np.transpose([1,0,0,0,0,0,1,0,1,0,0]))#####this is the correct label
 		print(i)
 	print("Finished")
 
@@ -109,7 +121,7 @@ def differences(X,Y,T):
 			break
 		T.append(4)
 		X.append(frame)
-		Y.append(np.transpose([0,1,0,0,0,0,1,0,0,1,0]))
+		Y.append(np.transpose([0,1,0,0,0,0,0,1,0,1,0]))#####this is the correct label
 		print(i)
 	print("Finished")
 
@@ -128,7 +140,7 @@ def pmaths(X,Y,T):
 			break
 		T.append(5)
 		X.append(frame)
-		Y.append(np.transpose([0,0,0,1,0,0,1,0,0,1,0]))
+		Y.append(np.transpose([0,0,0,1,0,0,0,1,0,0,1]))#####this is the correct label but change in h5mod
 		print(i)
 	print("Finished")
 
@@ -147,7 +159,7 @@ def bmaths(X,Y,T):
 			break
 		T.append(6)
 		X.append(frame)
-		Y.append(np.transpose([0,1,0,0,0,0,1,0,0,1,0]))
+		Y.append(np.transpose([0,1,0,0,0,0,0,1,0,1,0]))#####this is the correct label but change in h5mod
 		print(i)
 	print("Finished")
 
@@ -166,7 +178,7 @@ def talking(X,Y,T):
 			break
 		T.append(7)
 		X.append(frame)
-		Y.append(np.transpose([0,0,1,0,0,1,0,0,0,1,1]))
+		Y.append(np.transpose([0,0,1,0,0,1,0,0,0,0,1]))#####this is the correct label 
 		print(i)
 	print("Finished")
 
@@ -188,7 +200,7 @@ def youtube(X,Y,T):
 			break
 		T.append(8)
 		X.append(frame)
-		Y.append(np.transpose([1,0,0,0,0,1,0,0,0,0,1]))
+		Y.append(np.transpose([1,0,0,0,0,1,0,0,0,1,0]))#####this is the correct label
 		print(i)
 	print("Finished")
 
@@ -207,7 +219,7 @@ def funtext(X,Y,T):
 			break
 		T.append(9)
 		X.append(frame)
-		Y.append(np.transpose([0,1,0,0,0,1,0,0,0,0,1]))
+		Y.append(np.transpose([0,1,0,0,0,1,0,0,0,1,0]))#####this is the correct label
 		print(i)
 	print("Finished")
 
@@ -217,10 +229,10 @@ def h5_create(datapath):
 	u_shape = (4,1) #user no, gender, age, eye color
 	t_shape = (1,1)
 	with h5py.File(datapath, mode='a') as h5f:
-		xdset = h5f.create_dataset('X', (0,) + x_shape, maxshape=(None,) + x_shape, dtype='i1', chunks=(100,) + x_shape)
-		ydset = h5f.create_dataset('Y', (0,) + y_shape, maxshape=(None,) + y_shape, dtype='i1', chunks=(100,) + y_shape)
-		udset = h5f.create_dataset('U', (0,) + u_shape, maxshape=(None,) + u_shape, dtype='i1', chunks=(100,) + u_shape)
-		tdset = h5f.create_dataset('T', (0,) + t_shape, maxshape=(None,) + u_shape, dtype='i1', chunks=(100,) + u_shape)
+		xdset = h5f.create_dataset('X', (0,) + x_shape, maxshape=(None,) + x_shape, dtype='uint8', chunks=(100,) + x_shape)
+		ydset = h5f.create_dataset('Y', (0,) + y_shape, maxshape=(None,) + y_shape, dtype='uint8', chunks=(100,) + y_shape)
+		udset = h5f.create_dataset('U', (0,) + u_shape, maxshape=(None,) + u_shape, dtype='uint8', chunks=(100,) + u_shape)
+		tdset = h5f.create_dataset('T', (0,) + t_shape, maxshape=(None,) + u_shape, dtype='uint8', chunks=(100,) + u_shape)
 
 def h5_append(datapath, U, X, Y, T):
 	x_shape = (300, 440, 3)
@@ -250,41 +262,39 @@ def h5_append(datapath, U, X, Y, T):
 			tdset[-1:] = T[i]
 			print(tdset.shape)
 
+def crop_and_focus(CAMERA_NO, cap):
+	eye_focus.setup_camera(CAMERA_NO, cap)
+	x,y = detect_iris.get_cordinates(cap)
+	if(x > 480 - 150):
+		x = 480 - 150
+	if(y < 220):
+		y = 220
+	return x,y
 
-user_no = 140
-Gender = 1
-# Male = 1
-# Female = 2
-age = 30
-eye_color = 1
-# Brown = 1
-# Black	= 2
-# Blue = 3
-# blue-ish green = 4
-ztharhaerh
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(CAMERA_NO)
+x_center, y_center = crop_and_focus(CAMERA_NO, cap)
+x1 = x_center - int(IMAGE_HEIGHT / 2)
+x2 = x_center + int(IMAGE_HEIGHT / 2)
+y1 = y_center - int(IMAGE_WIDTH / 2)
+y2 = y_center + int(IMAGE_WIDTH / 2)
+print([x1,x2,y1,y2])
 
 count1 = 0
-crop_x1 = 150
-crop_x2 = crop_x1 + 300
-crop_y1 = 150
-crop_y2 = crop_y1 + 440
-
 while(True):
 	count1 = count1 + 1    
 	# Capture frame-by-frame
 	ret, frame1 = cap.read()
-	frame  = frame1[crop_x1:crop_x2, crop_y1:crop_y2]
-
+	
+	frame  = frame1[ x1:x2 , y1:y2 ]
 	# Our operations on the frame come here
 	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-	frame_name = str(user_no) + '_' + str(count1) + '.jpg'
-	if(count1 %100 == 0):
-		cv2.imwrite(frame_name, frame1)
-
+	# frame_name = str(user_no) + '_' + str(count1) + '.jpg'
+	# if(count1 %100 == 0):
+	# 	cv2.imwrite(frame_name, frame)
+	# cv2.circle(frame, (100, 300), 30, (0, 0, 255), 2)
 	# Display the resulting frame
-	cv2.imshow('frame',frame1)
+	cv2.imshow('frame',frame)
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 	    break
 
@@ -338,7 +348,7 @@ Y_train = np.asarray(Y)
 U = np.asarray(np.transpose([[user_no,Gender,age,eye_color]])) #user no, gender, age, eye color
 T = np.asarray(T)
 
-h5_create(filename) #comment this line if your appending to the same data file by running the code again and again. otherwise it will raise 'file already exist error and you will loose the data'
+h5_create(filename)
 h5_append(filename, U, X_train, Y_train, T)
 
 cap.release()
