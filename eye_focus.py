@@ -85,6 +85,12 @@ def calibrate(camera, cap):
 	local_min_focus_level = min_focus_level
 	max_not_found = True
 	local_optimal_focus = INITIAL_OPTIMAL_FOCUS
+
+	while(True):
+		res = input("\n\nTurn your face towards the monitor. look at the middle of the monitor, keep your eyes open wide. This is will only take 5-10 seconds. Try to keep a low blinking frequency and type c and pres enter to start calibration. ")
+		if(res == 'c'):
+			break
+
 	while(not_focused):
 		status = "Calibrating Camera" + "|" + "-" * focus_level + "|"
 		print(status, end="\r")

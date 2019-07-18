@@ -13,4 +13,4 @@ class generator:
 			print(X_dset.shape[0])
 			# for j in range(100):
 			for i in range(X_dset.shape[0] - X_dset.shape[0] % 64):
-				yield X_dset[i], np.argmax(Y_dset[i,:,0:5]), np.argmax(Y_dset[i,:,5:8]), np.argmax(Y_dset[i,:,8:11])
+				yield X_dset[i], np.argmax(Y_dset[i,:,0:4]), np.argmax(Y_dset[i,:,4:7])
