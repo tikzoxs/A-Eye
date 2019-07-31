@@ -27,9 +27,9 @@ y1 = 0
 y2 = FRAME_WIDTH
 
 #user information
-user_no = 100
+user_no = 7
 Gender = 1 # Male = 1 | Female = 2
-age = 30
+age = 32
 eye_color = 1 # Brown = 1 | Black	= 2 | Blue = 3 | Blue-ish green = 4
 
 def paper_low(X,Y,T,U):
@@ -157,7 +157,7 @@ def screen_medium_1(X,Y,T,U):
 		if(j == 27):
 			break
 		one_data[:,:,i%IMAGE_CHANNELS] = gray
-		print(i%IMAGE_CHANNELS)
+		# print(i%IMAGE_CHANNELS)
 		if(i%IMAGE_CHANNELS == IMAGE_CHANNELS - 1):
 			X.append(one_data)
 			T.append(5)
@@ -338,6 +338,7 @@ def h5_append(datapath, U, X, Y, T):
 			print(tdset.shape)
 
 def crop_and_focus(CAMERA_NO, cap):
+	eye_focus.setup_camera(CAMERA_NO, cap)
 	y,x = detect_iris.get_cordinates(cap)
 	y = y - Y_ADJUSMENT
 	print(y)
@@ -351,78 +352,82 @@ def crop_and_focus(CAMERA_NO, cap):
 		y = FRAME_WIDTH - IMAGE_WIDTH/2
 	return int(x),int(y)
 
-cap = cv2.VideoCapture(CAMERA_NO)
-x_center, y_center = crop_and_focus(CAMERA_NO, cap)
-x1 = x_center - int(IMAGE_HEIGHT / 2)
-x2 = x_center + int(IMAGE_HEIGHT / 2)
-y1 = y_center - int(IMAGE_WIDTH / 2)
-y2 = y_center + int(IMAGE_WIDTH / 2)
-print([x1,x2,y1,y2])
+def main():
+	cap = cv2.VideoCapture(CAMERA_NO)
+	x_center, y_center = crop_and_focus(CAMERA_NO, cap)
+	x1 = x_center - int(IMAGE_HEIGHT / 2)
+	x2 = x_center + int(IMAGE_HEIGHT / 2)
+	y1 = y_center - int(IMAGE_WIDTH / 2)
+	y2 = y_center + int(IMAGE_WIDTH / 2)
+	print([x1,x2,y1,y2])
 
-count1 = 0
-while(True):
-	count1 = count1 + 1    
-	ret, frame1 = cap.read()
-	frame  = frame1[ x1:x2 , y1:y2 ].copy()
-	gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-	cv2.imshow('cropped_frame',frame)
-	if cv2.waitKey(1) & 0xFF == ord('q'):
-	    break
+	count1 = 0
+	while(True):
+		count1 = count1 + 1    
+		ret, frame1 = cap.read()
+		frame  = frame1[ x1:x2 , y1:y2 ].copy()
+		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+		cv2.imshow('cropped_frame',frame)
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+		    break
 
-X = []
-Y = []
-T = []
-U = np.asarray(np.transpose([[user_no,Gender,age,eye_color]])) #user no, gender, age, eye color
+	X = []
+	Y = []
+	T = []
+	U = np.asarray(np.transpose([[user_no,Gender,age,eye_color]])) #user no, gender, age, eye color
 
-print("Press 's' to start")
+	print("Press 's' to start")
 
-while chr(cv2.waitKey()) != 's':
-	continue
+	while chr(cv2.waitKey()) != 's':
+		continue
 
-count = 0
+	count = 0
 
-filename = 'tests.h5'
+	filename = 'tests.h5'
 
-while(True):
-	count = count + 1    
-	ret, frame = cap.read()
-	print("Select Test")
+	while(True):
+		count = count + 1    
+		ret, frame = cap.read()
+		print("Select Test")
 
-	g = chr(cv2.waitKey())
-	filename = str(user_no) + '_' + g + ".h5"
-	print(filename)
+		g = chr(cv2.waitKey())
+		filename = str(user_no) + '_' + g + ".h5"
+		print(filename)
 
-	if(g == '0'):
-		other(X,Y,T,U)
-	if(g == '1'):
-		paper_low(X,Y,T,U)
-	if(g == '2'):
-		paper_medium(X,Y,T,U)
-	if(g == '3'):
-		paper_high(X,Y,T,U)
-	if(g == '4'):
-		screen_low(X,Y,T,U)
-	if(g == '5'):
-		screen_medium_1(X,Y,T,U)
-	if(g == '6'):
-		screen_medium_2(X,Y,T,U)
-	if(g == '7'):
-		screen_high(X,Y,T,U)
-	if(g == '8'):
-		person_low(X,Y,T,U)
-	if(g == '9'):
-		person_medium(X,Y,T,U)
+		if(g == '0'):
+			other(X,Y,T,U)
+		if(g == '1'):
+			paper_low(X,Y,T,U)
+		if(g == '2'):
+			paper_medium(X,Y,T,U)
+		if(g == '3'):
+			paper_high(X,Y,T,U)
+		if(g == '4'):
+			screen_low(X,Y,T,U)
+		if(g == '5'):
+			screen_medium_1(X,Y,T,U)
+		if(g == '6'):
+			screen_medium_2(X,Y,T,U)
+		if(g == '7'):
+			screen_high(X,Y,T,U)
+		if(g == '8'):
+			person_low(X,Y,T,U)
+		if(g == '9'):
+			person_medium(X,Y,T,U)
 
-	if(count == 1):
-		break
+		if(count == 1):
+			break
 
-X_train = np.asarray(X)
-Y_train = np.asarray(Y)
+	X_train = np.asarray(X)
+	Y_train = np.asarray(Y)
 
-T = np.asarray(T)
+	T = np.asarray(T)
 
-h5_create(filename)
-h5_append(filename, U, X_train, Y_train, T)
+	h5_create(filename)
+	h5_append(filename, U, X_train, Y_train, T)
 
-cap.release()
-cv2.destroyAllWindows()
+	cap.release()
+	cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main()

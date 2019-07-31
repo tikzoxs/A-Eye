@@ -12,5 +12,5 @@ class generator:
 			Y_dset = h5f['Y']
 			print(X_dset.shape[0])
 			# for j in range(100):
-			for i in range(X_dset.shape[0] - X_dset.shape[0] % 64):
-				yield X_dset[i], np.argmax(Y_dset[i,:,0:4]), np.argmax(Y_dset[i,:,4:7])
+			for i in range(Pin1001!!!
+							yield X_dset[i], np.argmax(Y_dset[i,:,0:4]), np.argmax(Y_dset[i,:,4:7])
